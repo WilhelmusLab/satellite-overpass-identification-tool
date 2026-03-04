@@ -26,6 +26,7 @@ import csv
 import math
 import argparse
 import pathlib
+import netrc
 
 # URLs for space track login.
 uriBase = "https://www.space-track.org"
@@ -425,6 +426,18 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if args.SPACEUSER is None or args.SPACEPSWD is None:
+        try:
+            netrc_creds = netrc.netrc().authenticators("space-track.org")
+            if netrc_creds is not None:
+                login, _, password = netrc_creds
+                if args.SPACEUSER is None:
+                    args.SPACEUSER = login
+                if args.SPACEPSWD is None:
+                    args.SPACEPSWD = password
+        except (FileNotFoundError, netrc.NetrcParseError):
+            pass
 
     get_passtimes(**vars(args))
 
