@@ -32,7 +32,21 @@ import netrc
 # URLs for space track login.
 uriBase = "https://www.space-track.org"
 requestLogin = "/ajaxauth/login"
+netrc_message = """
+To avoid this error, either set SPACEUSER and SPACEPSWD as environment variables,
+or create a .netrc file with your space-track.org credentials.
 
+Add the following lines to a file named .netrc in your home directory, 
+replacing USERNAME and PASSWORD with your space-track.org credentials:
+
+machine space-track.org
+login USERNAME
+password PASSWORD
+
+Ensure the file has the correct permissions, 
+e.g., `chmod 600 ~/.netrc` on Unix systems
+to keep your credentials secure.
+"""
 
 # Define error.
 class MyError(Exception):
@@ -257,7 +271,7 @@ def get_Data(credentials: dict, start_date, end_date):
         resp = session.post(uriBase + requestLogin, data=credentials)
         if resp.status_code != 200:
             raise MyError(
-                resp, "POST fail on login. Your username/password may be incorrect."
+                resp, "POST fail on login. Your username/password may be incorrect. Check the ~/.netrc file or environment variables and try again."
             )
 
         # Retrieve Aqua TLEs from space track.
@@ -426,6 +440,7 @@ def main():
     args = parser.parse_args()
 
     if args.SPACEUSER is None or args.SPACEPSWD is None:
+        print("Using ~/.netrc file for space-track.org credentials")
         try:
             netrc_creds = netrc.netrc().authenticators("space-track.org")
             if netrc_creds is not None:
@@ -435,8 +450,8 @@ def main():
                 if args.SPACEPSWD is None:
                     args.SPACEPSWD = password
         except (FileNotFoundError, netrc.NetrcParseError) as e:
-            print("Something went wrong when parsing .netrc file: {e}")
-            pass
+            print(netrc_message)
+            raise e
 
     get_passtimes(**vars(args))
 
