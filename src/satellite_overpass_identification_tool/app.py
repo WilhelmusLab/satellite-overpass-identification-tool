@@ -30,16 +30,17 @@ import pathlib
 import netrc
 
 # URLs for space track login.
-uriBase = "https://www.space-track.org"
+domain = "space-track.org"
+uriBase = f"https://{domain}"
 requestLogin = "/ajaxauth/login"
-netrc_message = """
+netrc_message = f"""
 To avoid this error, either set SPACEUSER and SPACEPSWD as environment variables,
-or create a .netrc file with your space-track.org credentials.
+or create a .netrc file with your {domain} credentials.
 
 Add the following lines to a file named .netrc in your home directory, 
-replacing USERNAME and PASSWORD with your space-track.org credentials:
+replacing USERNAME and PASSWORD with your {domain} credentials:
 
-machine space-track.org
+machine {domain}
 login USERNAME
 password PASSWORD
 
@@ -440,9 +441,9 @@ def main():
     args = parser.parse_args()
 
     if args.SPACEUSER is None or args.SPACEPSWD is None:
-        print("Using ~/.netrc file for space-track.org credentials")
+        print(f"Using ~/.netrc file for {domain} credentials")
         try:
-            netrc_creds = netrc.netrc().authenticators("space-track.org")
+            netrc_creds = netrc.netrc().authenticators(domain)
             if netrc_creds is not None:
                 login, _, password = netrc_creds
                 if args.SPACEUSER is None:
