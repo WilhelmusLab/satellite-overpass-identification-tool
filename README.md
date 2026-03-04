@@ -14,6 +14,11 @@ Your [space-track.org](https://www.space-track.org/auth/createAccount) credentia
    password yourpassword
    ```
    When `--SPACEUSER` or `--SPACEPSWD` are not provided, the tool will automatically look up credentials from `~/.netrc`.
+   
+   Ensure the file only has read permissions for the user by calling 
+   ```bash
+   chmod og-rw ~/.netrc
+   ```
 
 ## Run the code
 
