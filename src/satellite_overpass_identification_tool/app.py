@@ -434,7 +434,8 @@ def main():
                     args.SPACEUSER = login
                 if args.SPACEPSWD is None:
                     args.SPACEPSWD = password
-        except (FileNotFoundError, netrc.NetrcParseError):
+        except (FileNotFoundError, netrc.NetrcParseError) as e:
+            print("Something went wrong when parsing .netrc file: {e}")
             pass
 
     get_passtimes(**vars(args))
