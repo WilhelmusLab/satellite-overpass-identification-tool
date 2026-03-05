@@ -26,6 +26,7 @@ import numpy as np
 import csv
 import math
 import argparse
+import os
 import pathlib
 import netrc
 
@@ -388,6 +389,61 @@ def getclosest(aqua, terra, aoi, t0, t1, altitude_degrees=30):
     return aqua_closest, terra_closest
 
 
+def get_credentials(domain, args=None):
+    """Get username and password from args, environment variables, or .netrc file.
+
+    Checks for credentials in the following order:
+    1. The ``args`` namespace (SPACEUSER and SPACEPSWD attributes)
+    2. Environment variables ``SPACEUSER`` and ``SPACEPSWD``
+    3. The ``~/.netrc`` file
+
+    Args:
+        domain: The domain name to look up credentials for.
+        args: Optional argparse namespace with SPACEUSER and SPACEPSWD attributes.
+
+    Returns:
+        A tuple of (username, password). Either value may be None if not found.
+
+    Examples:
+        >>> import argparse
+        >>> ns = argparse.Namespace(SPACEUSER="user1", SPACEPSWD="pass1")
+        >>> get_credentials("example.com", args=ns)
+        ('user1', 'pass1')
+
+        >>> get_credentials("example.com", args=None)
+        (None, None)
+
+    """
+    username = None
+    password = None
+
+    # 1. Check args
+    if args is not None:
+        username = getattr(args, "SPACEUSER", None)
+        password = getattr(args, "SPACEPSWD", None)
+
+    # 2. Check environment variables
+    if username is None:
+        username = os.environ.get("SPACEUSER")
+    if password is None:
+        password = os.environ.get("SPACEPSWD")
+
+    # 3. Check .netrc file
+    if username is None or password is None:
+        try:
+            netrc_creds = netrc.netrc().authenticators(domain)
+            if netrc_creds is not None:
+                login, _, netrc_password = netrc_creds
+                if username is None:
+                    username = login
+                if password is None:
+                    password = netrc_password
+        except (FileNotFoundError, netrc.NetrcParseError):
+            pass
+
+    return username, password
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Aqua and Terra Satellite Overpass time tool"
@@ -440,19 +496,15 @@ def main():
 
     args = parser.parse_args()
 
+    args.SPACEUSER, args.SPACEPSWD = get_credentials(domain, args=args)
+
     if args.SPACEUSER is None or args.SPACEPSWD is None:
-        print(f"Using ~/.netrc file for {domain} credentials")
-        try:
-            netrc_creds = netrc.netrc().authenticators(domain)
-            if netrc_creds is not None:
-                login, _, password = netrc_creds
-                if args.SPACEUSER is None:
-                    args.SPACEUSER = login
-                if args.SPACEPSWD is None:
-                    args.SPACEPSWD = password
-        except (FileNotFoundError, netrc.NetrcParseError) as e:
-            print(netrc_message)
-            raise e
+        print(netrc_message)
+        raise SystemExit(
+            f"Error: No credentials found for {domain}. "
+            "Provide --SPACEUSER and --SPACEPSWD, set SPACEUSER and SPACEPSWD "
+            "environment variables, or add credentials to your ~/.netrc file."
+        )
 
     get_passtimes(**vars(args))
 
