@@ -16,7 +16,7 @@ dependencies = [
 dev = ["pytest"]
 
 [project.scripts]
-soit="app:main"
+soit="satellite_overpass_identification_tool:main"
 
 [build-system]
 requires = ["hatchling"]
