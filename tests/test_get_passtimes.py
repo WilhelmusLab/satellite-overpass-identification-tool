@@ -65,8 +65,11 @@ def test_get_passtimes(credentials, start_date, end_date, lat, lon):
     "date,lat,lon,expected_aqua,expected_terra",
     [
         ("2019-03-23", 71, -129, "2019-03-23T20:08:47Z", "2019-03-23T21:28:12Z"),
+        ("2005-06-07", 60, -83.0, "2005-06-07T18:53:00Z", "2005-06-07T17:05:01Z"),
+        ("2015-03-08", 75, 40, "2015-03-08T09:02:30Z", "2015-03-08T10:19:39Z"),
+        ("2020-12-25", 77, 77, "2020-12-25T05:50:55Z", "2020-12-25T08:45:21Z"),
     ],
-    ids=["2019-03-23"],
+    ids=["beaufort_sea: 2019-03-23", "hudson_bay: 2005-06-07", "barents_sea: 2015-03-08", "kara_sea: 2020-12-25"],
 )
 def test_get_passtimes_specific(credentials, date, lat, lon, expected_aqua, expected_terra):
     """Verify specific overpass times for a given date and coordinates."""
