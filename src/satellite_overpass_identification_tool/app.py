@@ -34,15 +34,17 @@ domain = "space-track.org"
 uriBase = f"https://{domain}"
 requestLogin = "/ajaxauth/login"
 netrc_message = f"""
-To avoid this error, either set SPACEUSER and SPACEPSWD as environment variables,
-or create a .netrc file with your {domain} credentials.
+{domain} SPACEUSER and SPACEPSWD can be set:
+- on the command line,
+- as environment variables,
+- or in a .netrc file.
 
 Add the following lines to a file named .netrc in your home directory, 
 replacing USERNAME and PASSWORD with your {domain} credentials:
 
 machine {domain}
-login USERNAME
-password PASSWORD
+        login USERNAME
+        password PASSWORD
 
 Ensure the file has the correct permissions, 
 e.g., `chmod 600 ~/.netrc` on Unix systems
@@ -390,7 +392,9 @@ def getclosest(aqua, terra, aoi, t0, t1, altitude_degrees=30):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Aqua and Terra Satellite Overpass time tool"
+        description="Aqua and Terra Satellite Overpass time tool",
+        epilog=netrc_message,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
         "--SPACEUSER",
@@ -451,8 +455,7 @@ def main():
                 if args.SPACEPSWD is None:
                     args.SPACEPSWD = password
         except (FileNotFoundError, netrc.NetrcParseError) as e:
-            print(netrc_message)
-            raise e
+            pass
 
     get_passtimes(**vars(args))
 
