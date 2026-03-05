@@ -2,12 +2,28 @@
 
 The [Satellite Overpass Identification Tool](https://zenodo.org/record/6475619#.ZBhat-zMJUe) is called to generate a list of satellite times for both Aqua and Terra in the area of interest.
 
-## Credentials
+## Usage
 
-Your [space-track.org](https://www.space-track.org/auth/createAccount) credentials can be provided in two ways:
+Install for general use:
+```bash
+pipx install --spec "git+https://github.com/wilhelmuslab/satellite-overpass-identification-tool" soit
+soit --help
+```
 
-1. **Command-line arguments**: Pass `--SPACEUSER` and `--SPACEPSWD` directly.
-2. **`.netrc` file**: Add an entry for `space-track.org` to your `~/.netrc` file:
+Run anywhere:
+```bash
+pipx run --spec "git+https://github.com/wilhelmuslab/satellite-overpass-identification-tool" soit --help
+```
+
+Your [space-track.org](https://www.space-track.org/auth/createAccount) credentials can be provided as follows:
+
+1. **Command-line arguments**: Pass `--SPACEUSER` and `--SPACEPSWD` as arguments to `soit`
+2. **Environment variables**: Set `SPACEUSER` and `SPACEPSWD` as environment variables:
+   ```bash
+   export SPACEUSER=your@email.com
+   export SPACEPSWD=yourpassword
+   ```
+3. **`.netrc` file**: Add an entry for `space-track.org` to your `~/.netrc` file:
    ```
    machine space-track.org
    login your@email.com
@@ -19,20 +35,3 @@ Your [space-track.org](https://www.space-track.org/auth/createAccount) credentia
    ```bash
    chmod og-rw ~/.netrc
    ```
-
-## Run the code
-
-You can run the local version of the code from this directory by calling
-```bash
-pipx run . soit
-```
-
-You can run the code anywhere by calling:
-```bash
-pipx run --spec "git+https://github.com/wilhelmuslab/ice-floe-tracker-pipeline#egg=satellite-overpass-identification-tool&subdirectory=satellite-overpass-identification-tool" soit
-```
-
-You can run the Docker image by calling:
-```bash
-docker run -it brownccv/icefloetracker-soit
-```
