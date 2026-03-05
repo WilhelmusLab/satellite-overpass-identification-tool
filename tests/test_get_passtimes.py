@@ -21,16 +21,22 @@ def credentials():
 
 @pytest.mark.integration
 @pytest.mark.parametrize(
-    "start_date,end_date,lat,lon,expected_rows",
+    "region,start_date,end_date,lat,lon,expected_rows",
     [
-        ("2001-01-01", "2001-01-31", 71, -129, 31),   # Terra only (Aqua launched May 2002)
-        ("2005-05-01", "2005-05-31", 71, -129, 62),   # Both satellites
-        ("2019-03-20", "2019-03-25", 71, -129, 12),   # Both satellites, 6 days
-        ("2025-03-01", "2025-03-31", 71, -129, 62),   # Both satellites
+        pytest.param("beaufort_sea", "2001-01-01", "2001-01-31", 71, -129, 31, id="beaufort_sea: 2001-01 (terra only)"),
+        pytest.param("beaufort_sea", "2002-02-01", "2002-02-28", 71, -129, 28, id="beaufort_sea: 2002-02 (terra only)"),
+        pytest.param("beaufort_sea", "2005-05-01", "2005-05-31", 71, -129, 62, id="beaufort_sea: 2005-05"),
+        pytest.param("beaufort_sea", "2019-03-20", "2019-03-25", 71, -129, 12, id="beaufort_sea: 2019-03"),
+        pytest.param("beaufort_sea", "2025-03-01", "2025-03-31", 71, -129, 62, id="beaufort_sea: 2025-03"),
+        pytest.param("hudson_bay", "2010-07-01", "2010-07-31", 60, -83, 62, id="hudson_bay: 2010-07"),
+        pytest.param("hudson_bay", "2018-08-15", "2018-08-21", 60, -83, 14, id="hudson_bay: 2018-08"),
+        pytest.param("barents_sea", "2012-01-01", "2012-01-15", 75, 40, 30, id="barents_sea: 2012-01"),
+        pytest.param("barents_sea", "2022-06-01", "2022-06-30", 75, 40, 60, id="barents_sea: 2022-06"),
+        pytest.param("kara_sea", "2015-09-01", "2015-09-14", 77, 77, 28, id="kara_sea: 2015-09"),
+        pytest.param("kara_sea", "2023-12-01", "2023-12-31", 77, 77, 62, id="kara_sea: 2023-12"),
     ],
-    ids=["beaufort_sea: 2001-01", "beaufort_sea: 2005-05", "beaufort_sea: 2019-03", "beaufort_sea: 2025-03"],
 )
-def test_get_passtimes(credentials, start_date, end_date, lat, lon, expected_rows):
+def test_get_passtimes(credentials, region, start_date, end_date, lat, lon, expected_rows):
     """Load overpass times for given date range and coordinates."""
     username, password = credentials
     
@@ -64,16 +70,15 @@ def test_get_passtimes(credentials, start_date, end_date, lat, lon, expected_row
 
 @pytest.mark.integration
 @pytest.mark.parametrize(
-    "date,lat,lon,expected_aqua,expected_terra",
+    "region,date,lat,lon,expected_aqua,expected_terra",
     [
-        ("2019-03-23", 71, -129, "2019-03-23T20:08:47Z", "2019-03-23T21:28:12Z"),
-        ("2005-06-07", 60, -83.0, "2005-06-07T18:53:00Z", "2005-06-07T17:05:01Z"),
-        ("2015-03-08", 75, 40, "2015-03-08T09:02:30Z", "2015-03-08T10:19:39Z"),
-        ("2020-12-25", 77, 77, "2020-12-25T05:50:55Z", "2020-12-25T08:45:21Z"),
+        pytest.param("beaufort_sea", "2019-03-23", 71, -129, "2019-03-23T20:08:47Z", "2019-03-23T21:28:12Z", id="beaufort_sea: 2019-03-23"),
+        pytest.param("hudson_bay", "2005-06-07", 60, -83.0, "2005-06-07T18:53:00Z", "2005-06-07T17:05:01Z", id="hudson_bay: 2005-06-07"),
+        pytest.param("barents_sea", "2015-03-08", 75, 40, "2015-03-08T09:02:30Z", "2015-03-08T10:19:39Z", id="barents_sea: 2015-03-08"),
+        pytest.param("kara_sea", "2020-12-25", 77, 77, "2020-12-25T05:50:55Z", "2020-12-25T08:45:21Z", id="kara_sea: 2020-12-25"),
     ],
-    ids=["beaufort_sea: 2019-03-23", "hudson_bay: 2005-06-07", "barents_sea: 2015-03-08", "kara_sea: 2020-12-25"],
 )
-def test_get_passtimes_specific(credentials, date, lat, lon, expected_aqua, expected_terra):
+def test_get_passtimes_specific(credentials, region, date, lat, lon, expected_aqua, expected_terra):
     """Verify specific overpass times for a given date and coordinates."""
     username, password = credentials
     
