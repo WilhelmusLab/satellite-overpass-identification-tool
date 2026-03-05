@@ -1,5 +1,6 @@
 """Integration tests for satellite overpass time retrieval."""
 
+import csv
 import os
 import tempfile
 
@@ -57,3 +58,51 @@ def test_get_passtimes(credentials, start_date, end_date, lat, lon):
         # Verify header
         header = lines[0].strip()
         assert "date" in header.lower() or "satellite" in header.lower()
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "date,lat,lon,expected_aqua,expected_terra",
+    [
+        ("2019-03-23", 71, -129, "2019-03-23T20:08:47Z", "2019-03-23T21:28:12Z"),
+    ],
+    ids=["2019-03-23"],
+)
+def test_get_passtimes_specific(credentials, date, lat, lon, expected_aqua, expected_terra):
+    """Verify specific overpass times for a given date and coordinates."""
+    username, password = credentials
+    
+    with tempfile.TemporaryDirectory() as tmpdir:
+        csvoutpath = os.path.join(tmpdir, "overpass_times.csv")
+        
+        get_passtimes(
+            start_date=_parsedate(date),
+            end_date=_parsedate(date),
+            csvoutpath=csvoutpath,
+            lat=lat,
+            lon=lon,
+            SPACEUSER=username,
+            SPACEPSWD=password,
+        )
+        
+        with open(csvoutpath) as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        
+        # Should have 2 rows: one for aqua, one for terra
+        assert len(rows) == 2, f"Expected 2 rows (aqua + terra), got {len(rows)}"
+        
+        # Extract rows by satellite
+        aqua_rows = [r for r in rows if r["satellite"] == "aqua"]
+        terra_rows = [r for r in rows if r["satellite"] == "terra"]
+        
+        assert len(aqua_rows) == 1, "Expected 1 aqua overpass"
+        assert len(terra_rows) == 1, "Expected 1 terra overpass"
+        
+        # Verify date
+        assert aqua_rows[0]["date"] == date
+        assert terra_rows[0]["date"] == date
+        
+        # Verify exact overpass times
+        assert aqua_rows[0]["overpass time"] == expected_aqua, f"Aqua time unexpected: {aqua_rows[0]['overpass time']}"
+        assert terra_rows[0]["overpass time"] == expected_terra, f"Terra time unexpected: {terra_rows[0]['overpass time']}"
