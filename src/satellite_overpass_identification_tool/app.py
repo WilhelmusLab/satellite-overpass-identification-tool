@@ -371,7 +371,11 @@ def get_closest_pass_for_satellite(satellite, aoi, t0, t1, ascending=True, altit
         closest_time = ""
 
         for pass_dict in passes:
-            if not np.isnan(pass_dict["rise_lat"]):
+            # Skip incomplete passes (no overpass data)
+            if "distance" not in pass_dict or "over_lat" not in pass_dict:
+                continue
+            
+            if "rise_lat" in pass_dict and not np.isnan(pass_dict["rise_lat"]):
                 is_ascending = (
                     (pass_dict["rise_lat"] < pass_dict["over_lat"])
                     if ascending
@@ -380,7 +384,7 @@ def get_closest_pass_for_satellite(satellite, aoi, t0, t1, ascending=True, altit
                 if is_ascending and pass_dict["distance"] < least_distance:
                     least_distance = pass_dict["distance"]
                     closest_time = pass_dict["time"]
-            else:
+            elif "set_lat" in pass_dict:
                 is_ascending = (
                     (pass_dict["set_lat"] > pass_dict["over_lat"])
                     if ascending
