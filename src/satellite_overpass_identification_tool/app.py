@@ -34,6 +34,12 @@ import netrc
 domain = "space-track.org"
 uriBase = f"https://{domain}"
 requestLogin = "/ajaxauth/login"
+
+# Satellite configurations: NORAD catalog IDs and orbit direction for pass filtering
+SATELLITES = {
+    "aqua": {"norad_id": 27424, "ascending": True},
+    "terra": {"norad_id": 25994, "ascending": False},
+}
 netrc_message = f"""
 {domain} SPACEUSER and SPACEPSWD can be set:
 - on the command line,
@@ -71,9 +77,9 @@ def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPS
     print(f"Timeframe starts on {start_date}, and ends on {end_date}")
     print(f"Coordinates (x, y): ({lat}, {lon})")
 
-    end_date = getNextDay(end_date)
+    end_date_next = getNextDay(end_date)
 
-    aquaData, terraData = get_Data(siteCred, start_date, end_date)
+    satellite_data = get_Data(siteCred, start_date, end_date_next)
 
     # Load in orbital mechanics tool timescale.
     ts = load.timescale()
@@ -85,34 +91,41 @@ def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPS
     today = start_date
     tomorrow = getNextDay(start_date)
 
-    # Define 2D array of values to be added to results CSV.
+    # Collect rows in unfolded format: [date, satellite, overpass_time]
     rows = []
 
     # Loop through each day until the end date of interest is reached.
-    while not np.array_equiv(today, end_date):
+    while not np.array_equiv(today, end_date_next):
+        print(today)
         # Get UTC time values of the start of today and the start of tomorrow.
-        # Passes between these times are considered.
         t0 = to_utc(today)
         t1 = to_utc(tomorrow)
 
-        min_diff_index, closest_aqua_epoch_to_t0 = getclosestepoch(t0, aquaData)
-        aqua_tleline1, aqua_tleline2 = get_tli_lines(aquaData[min_diff_index])
-        aqua = EarthSatellite(aqua_tleline1, aqua_tleline2, "AQUA", ts)
+        date_str = "-".join(today)
+        m, d, y = map(int, date_str.split("-"))
+        date_iso = str(datetime.date(y, m, d))
 
-        min_diff_index, closest_terra_epoch_to_t0 = getclosestepoch(t0, terraData)
-        terra_tleline1, terra_tleline2 = get_tli_lines(terraData[min_diff_index])
-        terra = EarthSatellite(terra_tleline1, terra_tleline2, "TERRA", ts)
+        # Process each satellite
+        for sat_name, sat_config in SATELLITES.items():
+            data = satellite_data.get(sat_name, [])
+            if not data:
+                continue
 
-        aqua_closest, terra_closest = getclosest(aqua, terra, aoi, t0, t1)
+            min_diff_index, _ = getclosestepoch(t0, data)
+            tle_line1, tle_line2 = get_tli_lines(data[min_diff_index])
+            satellite = EarthSatellite(tle_line1, tle_line2, sat_name.upper(), ts)
 
-        # Add closest passes of the day to array of passes.
-        rows.append(["-".join(today), aqua_closest, terra_closest])
+            closest_time = get_closest_pass_for_satellite(
+                satellite, aoi, t0, t1, ascending=sat_config["ascending"]
+            )
+            if closest_time:
+                rows.append([date_iso, sat_name, f"{date_iso}T{closest_time}Z"])
 
         today = getNextDay(today)
         tomorrow = getNextDay(today)
 
-    fields_, rows_ = convert_fields_mdy_folded_to_iso8601_unfolded(rows)
-    csvwrite(start_date, end_date, lat, lon, rows_, csvoutpath, fields=fields_)
+    fields = ["date", "satellite", "overpass time"]
+    csvwrite(start_date, end_date_next, lat, lon, rows, csvoutpath, fields=fields)
 
 def convert_fields_mdy_folded_to_iso8601_unfolded(rows):
     """Convert a row from [MM-DD-YYYY, UTC time (aqua), UTC time (terra)] to [YYYY-MM-DD, Satellite, ISO8601 datetime] format.
@@ -265,11 +278,16 @@ def to_utc(t):
 
 
 def get_Data(credentials: dict, start_date, end_date):
-    # URLs for space track login.
+    """Fetch TLE data for all configured satellites.
+    
+    Returns:
+        dict: Mapping of satellite name to TLE data list. Empty list if no data available.
+    """
     uriBase = "https://www.space-track.org"
     requestLogin = "/ajaxauth/login"
+    
+    epoch_range = f"{start_date[2]}-{start_date[0]}-{start_date[1]}--{end_date[2]}-{end_date[0]}-{end_date[1]}"
 
-    # Get TLEs from space track.
     with requests.Session() as session:
         # Log in with username and password.
         resp = session.post(uriBase + requestLogin, data=credentials)
@@ -278,34 +296,35 @@ def get_Data(credentials: dict, start_date, end_date):
                 resp, "POST fail on login. Your username/password may be incorrect. Check the ~/.netrc file or environment variables and try again."
             )
 
-        # Retrieve Aqua TLEs from space track.
-        resp = session.get(
-            f"https://www.space-track.org/basicspacedata/query/class/gp_history/NORAD_CAT_ID/27424/orderby/TLE_LINE1%20ASC/EPOCH/{start_date[2]}-{start_date[0]}-{start_date[1]}--{end_date[2]}-{end_date[0]}-{end_date[1]}/format/json"
-        )
-        if resp.status_code != 200:
-            print(resp)
-            raise MyError(resp, "GET fail on request")
+        satellite_data = {}
+        for sat_name, sat_config in SATELLITES.items():
+            norad_id = sat_config["norad_id"]
+            resp = session.get(
+                f"{uriBase}/basicspacedata/query/class/gp_history/NORAD_CAT_ID/{norad_id}/orderby/TLE_LINE1%20ASC/EPOCH/{epoch_range}/format/json"
+            )
+            if resp.status_code != 200:
+                print(f"Warning: Failed to fetch TLE data for {sat_name} (NORAD {norad_id}): {resp}")
+                satellite_data[sat_name] = []
+            else:
+                satellite_data[sat_name] = json.loads(resp.text)
 
-        # Turn JSON into Python dict.
-        aquaData = json.loads(resp.text)
-
-        # Retrieve Terra TLEs from space track.
-        resp = session.get(
-            f"https://www.space-track.org/basicspacedata/query/class/gp_history/NORAD_CAT_ID/25994/orderby/TLE_LINE1%20ASC/EPOCH/{start_date[2]}-{start_date[0]}-{start_date[1]}--{end_date[2]}-{end_date[0]}-{end_date[1]}/format/json"
-        )
-        if resp.status_code != 200:
-            print(resp)
-            raise MyError(resp, "GET fail on request")
-
-        # Turn JSON into Python dict.
-        terraData = json.loads(resp.text)
-
-        # No more requests.
-        session.close()
-    return aquaData, terraData
+    return satellite_data
 
 
-def getclosest(aqua, terra, aoi, t0, t1, altitude_degrees=30):
+def get_closest_pass_for_satellite(satellite, aoi, t0, t1, ascending=True, altitude_degrees=30):
+    """Find the closest pass time for a single satellite.
+    
+    Args:
+        satellite: EarthSatellite object
+        aoi: Area of interest (wgs84.latlon)
+        t0: Start time
+        t1: End time
+        ascending: Whether to filter for ascending (True) or descending (False) passes
+        altitude_degrees: Minimum altitude for pass detection
+    
+    Returns:
+        str: Time of closest pass in HH:MM:SS format, or empty string if no pass found
+    """
     def process_passes(satellite, events, times):
         passes = []
         pass_dict = {}
@@ -373,22 +392,9 @@ def getclosest(aqua, terra, aoi, t0, t1, altitude_degrees=30):
 
         return closest_time.split(" ")[3] if closest_time else ""
 
-    aqua_t, aqua_events = aqua.find_events(
-        aoi, t0, t1, altitude_degrees=altitude_degrees
-    )
-    terra_t, terra_events = terra.find_events(
-        aoi, t0, t1, altitude_degrees=altitude_degrees
-    )
-
-    aqua_passes = process_passes(aqua, aqua_events, aqua_t)
-    terra_passes = process_passes(terra, terra_events, terra_t)
-
-    aqua_closest, terra_closest = [
-        find_closest_pass(passes, ascending=ascending)
-        for passes, ascending in zip([aqua_passes, terra_passes], [True, False])
-    ]
-
-    return aqua_closest, terra_closest
+    times, events = satellite.find_events(aoi, t0, t1, altitude_degrees=altitude_degrees)
+    passes = process_passes(satellite, events, times)
+    return find_closest_pass(passes, ascending=ascending)
 
 
 def get_credentials(domain, args=None):
