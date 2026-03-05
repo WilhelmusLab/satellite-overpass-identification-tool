@@ -19,21 +19,24 @@ def credentials():
 
 
 @pytest.mark.integration
-def test_get_passtimes_january_2001(credentials):
-    """Load overpass times for January 2001 at lat=71, lon=-129."""
+@pytest.mark.parametrize(
+    "start_date,end_date,lat,lon",
+    [
+        ("2001-01-01", "2001-01-31", 71, -129),
+        ("2019-03-20", "2019-03-25", 71, -129),
+    ],
+    ids=["beaufort_sea: 2001-01", "beaufort_sea: 2019-03"],
+)
+def test_get_passtimes(credentials, start_date, end_date, lat, lon):
+    """Load overpass times for given date range and coordinates."""
     username, password = credentials
-    
-    start_date = _parsedate("2001-01-01")
-    end_date = _parsedate("2001-01-31")
-    lat = 71
-    lon = -129
     
     with tempfile.TemporaryDirectory() as tmpdir:
         csvoutpath = os.path.join(tmpdir, "overpass_times.csv")
         
         get_passtimes(
-            start_date=start_date,
-            end_date=end_date,
+            start_date=_parsedate(start_date),
+            end_date=_parsedate(end_date),
             csvoutpath=csvoutpath,
             lat=lat,
             lon=lon,
