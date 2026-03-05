@@ -16,7 +16,8 @@ dependencies = [
 dev = ["pytest", "pyfakefs"]
 
 [project.scripts]
-soit="app:main"
+soit="satellite_overpass_identification_tool:main"
+satellite-overpass-identification-tool="satellite_overpass_identification_tool:main"
 
 [build-system]
 requires = ["hatchling"]
