@@ -21,14 +21,16 @@ def credentials():
 
 @pytest.mark.integration
 @pytest.mark.parametrize(
-    "start_date,end_date,lat,lon",
+    "start_date,end_date,lat,lon,expected_rows",
     [
-        ("2001-01-01", "2001-01-31", 71, -129),
-        ("2019-03-20", "2019-03-25", 71, -129),
+        ("2001-01-01", "2001-01-31", 71, -129, 31),   # Terra only (Aqua launched May 2002)
+        ("2005-05-01", "2005-05-31", 71, -129, 62),   # Both satellites
+        ("2019-03-20", "2019-03-25", 71, -129, 12),   # Both satellites, 6 days
+        ("2025-03-01", "2025-03-31", 71, -129, 62),   # Both satellites
     ],
-    ids=["beaufort_sea: 2001-01", "beaufort_sea: 2019-03"],
+    ids=["beaufort_sea: 2001-01", "beaufort_sea: 2005-05", "beaufort_sea: 2019-03", "beaufort_sea: 2025-03"],
 )
-def test_get_passtimes(credentials, start_date, end_date, lat, lon):
+def test_get_passtimes(credentials, start_date, end_date, lat, lon, expected_rows):
     """Load overpass times for given date range and coordinates."""
     username, password = credentials
     
@@ -52,8 +54,8 @@ def test_get_passtimes(credentials, start_date, end_date, lat, lon):
         with open(csvoutpath) as f:
             lines = f.readlines()
         
-        # Should have header + at least some data rows (2 per day for aqua/terra)
-        assert len(lines) > 1, "CSV should have header and data rows"
+        # Should have header + expected data rows
+        assert len(lines) == expected_rows + 1, f"Expected {expected_rows} data rows + header, got {len(lines)} lines"
         
         # Verify header
         header = lines[0].strip()
