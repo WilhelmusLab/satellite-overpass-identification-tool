@@ -398,7 +398,8 @@ def get_closest_pass_for_satellite(satellite, aoi, t0, t1, ascending=True, altit
 
     times, events = satellite.find_events(aoi, t0, t1, altitude_degrees=altitude_degrees)
     passes = process_passes(satellite, events, times)
-    return find_closest_pass(passes, ascending=ascending)
+    closest_pass = find_closest_pass(passes, ascending=ascending)
+    return closest_pass
 
 
 def get_credentials(domain, args=None):
