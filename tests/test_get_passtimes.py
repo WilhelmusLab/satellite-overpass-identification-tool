@@ -1,79 +1,12 @@
 """Integration tests for satellite overpass time retrieval."""
 
-import time
 import datetime as dt
-from collections import deque
 from datetime import datetime
 
 import pytest
 
 import satellite_overpass_identification_tool.app as app_module
-from satellite_overpass_identification_tool.app import get_passtimes, get_credentials, domain
-
-
-def _get_data_rate_limited(get_data_func, credentials, start_date, end_date, request_timestamps, max_requests_per_minute=15):
-    """Call get_Data while limiting estimated API requests to max_requests_per_minute.
-
-    app_module.get_Data performs one login request and one request per satellite,
-    so we reserve 3 request slots for each call.
-    """
-    requests_per_get_data_call = 3
-    window_seconds = 60
-
-    while True:
-        now = time.monotonic()
-        while request_timestamps and now - request_timestamps[0] >= window_seconds:
-            request_timestamps.popleft()
-
-        if len(request_timestamps) + requests_per_get_data_call <= max_requests_per_minute:
-            break
-
-        sleep_seconds = window_seconds - (now - request_timestamps[0])
-        time.sleep(max(0.01, sleep_seconds))
-
-    satellite_data = get_data_func(
-        credentials=credentials,
-        start_date=start_date,
-        end_date=end_date,
-    )
-
-    request_timestamps.extend([time.monotonic()] * requests_per_get_data_call)
-    return satellite_data
-
-
-# Skip if credentials are not available
-@pytest.fixture
-def credentials():
-    """Get space-track.org credentials or skip the test."""
-    username, password = get_credentials(domain, args=None)
-    if username is None or password is None:
-        pytest.skip("space-track.org credentials not available")
-    return username, password
-
-
-@pytest.fixture(scope="module")
-def rate_limited_get_data():
-    """Provide a shared rate-limited get_Data wrapper for this module."""
-    request_timestamps = deque()
-    original_get_data = app_module.get_Data
-
-    def _wrapper(credentials, start_date, end_date):
-        return _get_data_rate_limited(
-            get_data_func=original_get_data,
-            credentials=credentials,
-            start_date=start_date,
-            end_date=end_date,
-            request_timestamps=request_timestamps,
-            max_requests_per_minute=15,
-        )
-
-    return _wrapper
-
-
-@pytest.fixture(autouse=True)
-def use_rate_limited_get_data(monkeypatch, rate_limited_get_data):
-    """Ensure all get_passtimes calls in this module use the shared rate-limited get_Data."""
-    monkeypatch.setattr(app_module, "get_Data", rate_limited_get_data)
+from satellite_overpass_identification_tool.app import get_passtimes
 
 
 @pytest.mark.integration
@@ -168,11 +101,9 @@ def test_get_passtimes_specific(credentials, region, date, lat, lon, expected_aq
 
 
 @pytest.fixture(scope="module")
-def validated_grid_data(rate_limited_get_data):
+def validated_grid_data(rate_limited_get_data, credentials):
     """Fetch and cache one day of TLE data for the validated overpass grid."""
-    username, password = get_credentials(domain, args=None)
-    if username is None or password is None:
-        pytest.skip("space-track.org credentials not available")
+    username, password = credentials
 
     date = "2025-05-15"
     start_date = dt.date.fromisoformat(date)
@@ -264,13 +195,12 @@ OVERPASS_VALIDATION_CASES = [
         "aqua",
         "2025-05-15T18:07:44Z", # checked
     ),
-    pytest.param(
+    (
         "2025-05-15",
         80,
         -120.0,
         "terra",
         "2025-05-15T21:46:30Z",  # checked
-        marks=pytest.mark.xfail(reason="Known broken validated case: terra at lon -120.0"),
     ),
     (
         "2025-05-15",
@@ -398,13 +328,12 @@ OVERPASS_VALIDATION_CASES = [
         "terra",
         "2025-05-15T11:54:57Z", # checked
     ),
-    pytest.param(
+    (
         "2025-05-15",
         80,
         30.0,
         "aqua",
         "2025-05-15T08:16:00Z",  # checked
-        marks=pytest.mark.xfail(reason="Known broken validated case: aqua at lon 30.0"),
     ),
     (
         "2025-05-15",
