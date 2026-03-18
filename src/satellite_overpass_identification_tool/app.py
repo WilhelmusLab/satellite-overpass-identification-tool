@@ -221,49 +221,52 @@ class PassEvent(IntEnum):
     SET = 2
 
 def process_passes(satellite, aoi, events, times):
-    """Build pass dictionaries from Skyfield event streams."""
+    """Build pass dictionaries from Skyfield event streams.
+
+    Passes are parsed from consecutive RISE/OVERPASS/SET triplets.
+    """
     passes = []
-    pass_dict = {}
     difference = satellite - aoi
+    i = 0
+    expected_block = (PassEvent.RISE, PassEvent.OVERPASS, PassEvent.SET)
 
-    for i, (event, ti) in enumerate(zip(events, times)):
+    while i + 2 < len(events):
+        raw_block = events[i : i + 3]
         try:
-            event_type = PassEvent(int(event))
+            event_block = tuple(PassEvent(int(event)) for event in raw_block)
         except ValueError as exc:
-            raise ValueError(f"Unexpected event type {event} at index {i}") from exc
+            raise ValueError(f"Unexpected event type in block starting at index {i}: {list(raw_block)}") from exc
 
-        geocentric = satellite.at(ti)
-        topocentric = difference.at(ti)
+        # If the stream starts/ends mid-pass, advance one event until we re-sync.
+        if event_block != expected_block:
+            i += 1
+            continue
 
-        if event_type == PassEvent.RISE:  # Rise
-            pass_dict = {}
-            riselat, riselon = wgs84.latlon_of(geocentric)
-            pass_dict["rise_lat"] = riselat.degrees
-            pass_dict["rise_lon"] = riselon.degrees
+        rise_t, overpass_t, set_t = times[i : i + 3]
 
-        elif event_type == PassEvent.OVERPASS:  # Overpass
-            alt, az, distance = topocentric.altaz()
-            pass_dict["distance"] = distance.km
-            pass_dict["time"] = ti.utc_strftime("%Y %b %d %H:%M:%S")
-            overlat, overlon = wgs84.latlon_of(geocentric)
-            pass_dict["over_lat"] = overlat.degrees
-            pass_dict["over_lon"] = overlon.degrees
+        rise_geocentric = satellite.at(rise_t)
+        overpass_geocentric = satellite.at(overpass_t)
+        overpass_topocentric = difference.at(overpass_t)
+        set_geocentric = satellite.at(set_t)
 
-            # Handle edge case for first overpass without prior rise
-            if i == 0:
-                pass_dict["rise_lat"] = float("nan")
-                pass_dict["rise_lon"] = float("nan")
-            # Handle edge case for last overpass without subsequent set
-            if i == len(events) - 1:
-                pass_dict["set_lat"] = float("nan")
-                pass_dict["set_lon"] = float("nan")
-                passes.append(pass_dict)
+        riselat, riselon = wgs84.latlon_of(rise_geocentric)
+        overlat, overlon = wgs84.latlon_of(overpass_geocentric)
+        setlat, setlon = wgs84.latlon_of(set_geocentric)
+        _, _, distance = overpass_topocentric.altaz()
 
-        elif event_type == PassEvent.SET:  # Set
-            setlat, setlon = wgs84.latlon_of(geocentric)
-            pass_dict["set_lat"] = setlat.degrees
-            pass_dict["set_lon"] = setlon.degrees
-            passes.append(pass_dict)
+        passes.append(
+            {
+                "rise_lat": riselat.degrees,
+                "rise_lon": riselon.degrees,
+                "distance": distance.km,
+                "time": overpass_t.utc_strftime("%Y %b %d %H:%M:%S"),
+                "over_lat": overlat.degrees,
+                "over_lon": overlon.degrees,
+                "set_lat": setlat.degrees,
+                "set_lon": setlon.degrees,
+            }
+        )
+        i += 3
 
     return passes
 
