@@ -71,9 +71,21 @@ def _parsedate(date):
     return datetime.datetime.strptime(date, "%Y-%m-%d").strftime("%m-%d-%Y").split("-")
 
 
-def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPSWD):
+PASS_TIMES_DTYPE = np.dtype([
+    ("date", "U10"),
+    ("satellite", "U10"),
+    ("overpass_time", "U20"),
+])
+
+
+def _rows_to_structured_array(rows):
+    if not rows:
+        return np.array([], dtype=PASS_TIMES_DTYPE)
+    return np.array([tuple(row) for row in rows], dtype=PASS_TIMES_DTYPE)
+
+
+def get_passtimes(start_date, end_date, lat, lon, SPACEUSER, SPACEPSWD):
     siteCred = {"identity": SPACEUSER, "password": SPACEPSWD}
-    print(f"Outpath {csvoutpath}")
     print(f"Timeframe starts on {start_date}, and ends on {end_date}")
     print(f"Coordinates (x, y): ({lat}, {lon})")
 
@@ -123,8 +135,8 @@ def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPS
         today = getNextDay(today)
         tomorrow = getNextDay(today)
 
-    fields = ["date", "satellite", "overpass time"]
-    csvwrite(start_date, end_date_next, lat, lon, rows, csvoutpath, fields=fields)
+    structured_array = _rows_to_structured_array(rows)
+    return structured_array
 
 def convert_fields_mdy_folded_to_iso8601_unfolded(rows):
     """Convert a row from [MM-DD-YYYY, UTC time (aqua), UTC time (terra)] to [YYYY-MM-DD, Satellite, ISO8601 datetime] format.
@@ -524,7 +536,23 @@ def main():
             "environment variables, or add credentials to your ~/.netrc file."
         )
 
-    get_passtimes(**vars(args))
+    if args.csvoutpath is None:
+        raise SystemExit("Error: --csvoutpath is required")
+
+    passtimes = get_passtimes(
+        start_date=args.start_date,
+        end_date=args.end_date,
+        lat=args.lat,
+        lon=args.lon,
+        SPACEUSER=args.SPACEUSER,
+        SPACEPSWD=args.SPACEPSWD,
+    )
+
+    source_fields = ["date", "satellite", "overpass_time"]
+    output_fields = ["date", "satellite", "overpass time"]
+    rows = [tuple(row[f] for f in source_fields) for row in passtimes]
+    end_date_next = getNextDay(args.end_date)
+    csvwrite(args.start_date, end_date_next, args.lat, args.lon, rows, args.csvoutpath, fields=output_fields)
 
 
 if __name__ == "__main__":

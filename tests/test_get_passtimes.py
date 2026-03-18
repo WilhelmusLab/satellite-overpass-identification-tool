@@ -1,8 +1,5 @@
 """Integration tests for satellite overpass time retrieval."""
 
-import csv
-import os
-import tempfile
 import time
 from collections import deque
 from datetime import datetime
@@ -73,33 +70,18 @@ def credentials():
 def test_get_passtimes(credentials, region, start_date, end_date, lat, lon, expected_rows):
     """Load overpass times for given date range and coordinates."""
     username, password = credentials
-    
-    with tempfile.TemporaryDirectory() as tmpdir:
-        csvoutpath = os.path.join(tmpdir, "overpass_times.csv")
-        
-        get_passtimes(
-            start_date=_parsedate(start_date),
-            end_date=_parsedate(end_date),
-            csvoutpath=csvoutpath,
-            lat=lat,
-            lon=lon,
-            SPACEUSER=username,
-            SPACEPSWD=password,
-        )
-        
-        # Verify output file was created
-        assert os.path.exists(csvoutpath)
-        
-        # Verify the file has content (header + data rows)
-        with open(csvoutpath) as f:
-            lines = f.readlines()
-        
-        # Should have header + expected data rows
-        assert len(lines) == expected_rows + 1, f"Expected {expected_rows} data rows + header, got {len(lines)} lines"
-        
-        # Verify header
-        header = lines[0].strip()
-        assert "date" in header.lower() or "satellite" in header.lower()
+
+    passtimes = get_passtimes(
+        start_date=_parsedate(start_date),
+        end_date=_parsedate(end_date),
+        lat=lat,
+        lon=lon,
+        SPACEUSER=username,
+        SPACEPSWD=password,
+    )
+
+    assert len(passtimes) == expected_rows, f"Expected {expected_rows} data rows, got {len(passtimes)}"
+    assert passtimes.dtype.names == ("date", "satellite", "overpass_time")
 
 
 @pytest.mark.integration
@@ -130,41 +112,33 @@ def test_get_passtimes(credentials, region, start_date, end_date, lat, lon, expe
 def test_get_passtimes_specific(credentials, region, date, lat, lon, expected_aqua, expected_terra):
     """Verify specific overpass times for a given date and coordinates."""
     username, password = credentials
-    
-    with tempfile.TemporaryDirectory() as tmpdir:
-        csvoutpath = os.path.join(tmpdir, "overpass_times.csv")
-        
-        get_passtimes(
-            start_date=_parsedate(date),
-            end_date=_parsedate(date),
-            csvoutpath=csvoutpath,
-            lat=lat,
-            lon=lon,
-            SPACEUSER=username,
-            SPACEPSWD=password,
-        )
-        
-        with open(csvoutpath) as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-        
-        # Extract rows by satellite
-        aqua_rows = [r for r in rows if r["satellite"] == "aqua"]
-        terra_rows = [r for r in rows if r["satellite"] == "terra"]
-        
-        # Verify expected row counts
-        expected_rows = sum(x is not None for x in (expected_aqua, expected_terra))
-        assert len(rows) == expected_rows, f"Expected {expected_rows} rows, got {len(rows)}"
-        
-        # Verify each satellite
-        for expected, sat_rows, name in [
-            (expected_aqua, aqua_rows, "aqua"),
-            (expected_terra, terra_rows, "terra"),
-        ]:
-            if expected is not None:
-                assert len(sat_rows) == 1, f"Expected 1 {name} overpass"
-                assert sat_rows[0]["date"] == date
-                assert sat_rows[0]["overpass time"] == expected, f"{name} time unexpected: {sat_rows[0]['overpass time']}"
+
+    passtimes = get_passtimes(
+        start_date=_parsedate(date),
+        end_date=_parsedate(date),
+        lat=lat,
+        lon=lon,
+        SPACEUSER=username,
+        SPACEPSWD=password,
+    )
+
+    # Extract rows by satellite
+    aqua_rows = passtimes[passtimes["satellite"] == "aqua"]
+    terra_rows = passtimes[passtimes["satellite"] == "terra"]
+
+    # Verify expected row counts
+    expected_rows = sum(x is not None for x in (expected_aqua, expected_terra))
+    assert len(passtimes) == expected_rows, f"Expected {expected_rows} rows, got {len(passtimes)}"
+
+    # Verify each satellite
+    for expected, sat_rows, name in [
+        (expected_aqua, aqua_rows, "aqua"),
+        (expected_terra, terra_rows, "terra"),
+    ]:
+        if expected is not None:
+            assert len(sat_rows) == 1, f"Expected 1 {name} overpass"
+            assert sat_rows[0]["date"] == date
+            assert sat_rows[0]["overpass_time"] == expected, f"{name} time unexpected: {sat_rows[0]['overpass_time']}"
 
 
 @pytest.fixture(scope="module")
@@ -595,28 +569,20 @@ def test_get_passtimes_validated_longitude_grid_parametrized(
 
     monkeypatch.setattr(app_module, "get_Data", lambda credentials, start_date, end_date: satellite_data)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        filename = f"overpass_{satellite}_{str(lon).replace('-', 'm').replace('.', '_')}.csv"
-        csvoutpath = os.path.join(tmpdir, filename)
+    passtimes = get_passtimes(
+        start_date=_parsedate(date),
+        end_date=_parsedate(date),
+        lat=lat,
+        lon=lon,
+        SPACEUSER=username,
+        SPACEPSWD=password,
+    )
 
-        get_passtimes(
-            start_date=_parsedate(date),
-            end_date=_parsedate(date),
-            csvoutpath=csvoutpath,
-            lat=lat,
-            lon=lon,
-            SPACEUSER=username,
-            SPACEPSWD=password,
-        )
-
-        with open(csvoutpath) as f:
-            rows = list(csv.DictReader(f))
-
-    sat_rows = [r for r in rows if r["satellite"] == satellite]
+    sat_rows = passtimes[passtimes["satellite"] == satellite]
     assert len(sat_rows) == 1, f"Expected 1 {satellite} overpass for lon={lon}"
     assert sat_rows[0]["date"] == date
 
-    observed_dt = datetime.fromisoformat(sat_rows[0]["overpass time"].replace("Z", "+00:00"))
+    observed_dt = datetime.fromisoformat(sat_rows[0]["overpass_time"].replace("Z", "+00:00"))
     expected_dt = datetime.fromisoformat(expected_time.replace("Z", "+00:00"))
 
     time_delta_seconds = abs((observed_dt - expected_dt).total_seconds())
