@@ -424,6 +424,7 @@ def get_credentials(domain, args=None):
         ('user1', 'pass1')
 
         When there aren't any environment variables or .netrc file, both username and password are None:
+        >>> from unittest import mock
         >>> with mock.patch.dict(os.environ, clear=True):
         ...     get_credentials("example.com", args=None)
         (None, None)
