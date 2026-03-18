@@ -6,6 +6,10 @@ on:
   pull_request:
     branches:
 
+concurrency:
+  group: ci-${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -23,4 +27,7 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Run tests
+        env:
+          SPACEUSER: ${{ vars.SPACEUSER }}
+          SPACEPSWD: ${{ secrets.SPACEPSWD }}
         run: pytest
