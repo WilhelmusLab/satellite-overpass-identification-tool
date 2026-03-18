@@ -29,6 +29,7 @@ import argparse
 import os
 import pathlib
 import netrc
+from enum import IntEnum
 
 # URLs for space track login.
 domain = "space-track.org"
@@ -214,6 +215,11 @@ def get_Data(credentials: dict, start_date, end_date):
     return satellite_data
 
 
+class PassEvent(IntEnum):
+    RISE = 0
+    OVERPASS = 1
+    SET = 2
+
 def process_passes(satellite, aoi, events, times):
     """Build pass dictionaries from Skyfield event streams."""
     passes = []
@@ -221,16 +227,21 @@ def process_passes(satellite, aoi, events, times):
     difference = satellite - aoi
 
     for i, (event, ti) in enumerate(zip(events, times)):
+        try:
+            event_type = PassEvent(int(event))
+        except ValueError as exc:
+            raise ValueError(f"Unexpected event type {event} at index {i}") from exc
+
         geocentric = satellite.at(ti)
         topocentric = difference.at(ti)
 
-        if event == 0:  # Rise
+        if event_type == PassEvent.RISE:  # Rise
             pass_dict = {}
             riselat, riselon = wgs84.latlon_of(geocentric)
             pass_dict["rise_lat"] = riselat.degrees
             pass_dict["rise_lon"] = riselon.degrees
 
-        elif event == 1:  # Overpass
+        elif event_type == PassEvent.OVERPASS:  # Overpass
             alt, az, distance = topocentric.altaz()
             pass_dict["distance"] = distance.km
             pass_dict["time"] = ti.utc_strftime("%Y %b %d %H:%M:%S")
@@ -248,7 +259,7 @@ def process_passes(satellite, aoi, events, times):
                 pass_dict["set_lon"] = float("nan")
                 passes.append(pass_dict)
 
-        else:  # Set
+        elif event_type == PassEvent.SET:  # Set
             setlat, setlon = wgs84.latlon_of(geocentric)
             pass_dict["set_lat"] = setlat.degrees
             pass_dict["set_lon"] = setlon.degrees
