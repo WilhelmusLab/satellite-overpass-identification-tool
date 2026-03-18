@@ -90,7 +90,7 @@ def test_process_passes_with_representative_terra_events(terra_20250515_events, 
 
     for expectation, actual in zip(expected_passes, passes):
         expected_time, expected_direction = expectation
-        actual_time = dt.datetime.fromtimestamp(actual["time"]).strftime("%H:%M:%S")
+        actual_time = actual["time"].utc_strftime("%H:%M:%S")
         actual_direction = actual.get("orbit_direction")
         assert actual_direction == expected_direction, f"Expected direction {expected_direction.value} but got {actual_direction.value if actual_direction else 'None'}"
         assert abs((dt.datetime.strptime(actual_time, "%H:%M:%S") - dt.datetime.strptime(expected_time, "%H:%M:%S")).total_seconds()) <= pass_times_tolerance_minutes * 60, f"Expected time {expected_time} but got {actual_time}"
