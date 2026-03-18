@@ -21,7 +21,7 @@
 import requests
 import json
 import datetime
-from skyfield.api import wgs84, load, EarthSatellite
+from skyfield.api import wgs84, load, EarthSatellite, utc, Time
 import numpy as np
 import csv
 import math
@@ -67,10 +67,6 @@ class MyError(Exception):
         self.args = args
 
 
-def _parsedate(date):
-    return datetime.datetime.strptime(date, "%Y-%m-%d").strftime("%m-%d-%Y").split("-")
-
-
 PASS_TIMES_DTYPE = np.dtype([
     ("date", "U10"),
     ("satellite", "U10"),
@@ -89,7 +85,7 @@ def get_passtimes(start_date, end_date, lat, lon, SPACEUSER, SPACEPSWD):
     print(f"Timeframe starts on {start_date}, and ends on {end_date}")
     print(f"Coordinates (x, y): ({lat}, {lon})")
 
-    end_date_next = getNextDay(end_date)
+    end_date_next = end_date + datetime.timedelta(days=1)
 
     satellite_data = get_Data(siteCred, start_date, end_date_next)
 
@@ -99,22 +95,22 @@ def get_passtimes(start_date, end_date, lat, lon, SPACEUSER, SPACEPSWD):
     # Specify area of interest.
     aoi = wgs84.latlon(lat, lon)
 
-    # Define today and tomorrow.
+    # Iterate from start_date through end_date, one day at a time.
     today = start_date
-    tomorrow = getNextDay(start_date)
 
     # Collect rows in unfolded format: [date, satellite, overpass_time]
     rows = []
 
     # Loop through each day until the end date of interest is reached.
-    while not np.array_equiv(today, end_date_next):
-        # Get UTC time values of the start of today and the start of tomorrow.
-        t0 = to_utc(today)
-        t1 = to_utc(tomorrow)
+    while today < end_date_next:
+        print(today)
+        tomorrow = today + datetime.timedelta(days=1)
 
-        date_str = "-".join(today)
-        m, d, y = map(int, date_str.split("-"))
-        date_iso = str(datetime.date(y, m, d))
+        # Get UTC time values of the start of today and the start of tomorrow.
+        t0 = ts.from_datetime(datetime.datetime.combine(today, datetime.datetime.min.time(), tzinfo=utc))
+        t1 = ts.from_datetime(datetime.datetime.combine(tomorrow, datetime.datetime.min.time(), tzinfo=utc))
+
+        date_iso = today.isoformat()
 
         # Process each satellite
         for sat_name, sat_config in SATELLITES.items():
@@ -132,50 +128,10 @@ def get_passtimes(start_date, end_date, lat, lon, SPACEUSER, SPACEPSWD):
             if closest_time:
                 rows.append([date_iso, sat_name, f"{date_iso}T{closest_time}Z"])
 
-        today = getNextDay(today)
-        tomorrow = getNextDay(today)
+        today = tomorrow
 
     structured_array = _rows_to_structured_array(rows)
     return structured_array
-
-def convert_fields_mdy_folded_to_iso8601_unfolded(rows):
-    """Convert a row from [MM-DD-YYYY, UTC time (aqua), UTC time (terra)] to [YYYY-MM-DD, Satellite, ISO8601 datetime] format.
-    
-    Examples:
-        >>> convert_fields_mdy_folded_to_iso8601_unfolded([("03-31-2013", "11:50:20", "14:45:05"),])  # doctest: +NORMALIZE_WHITESPACE
-        (['date', 'satellite', 'overpass time'],
-         [['2013-03-31', 'aqua',  '2013-03-31T11:50:20Z'], 
-          ['2013-03-31', 'terra', '2013-03-31T14:45:05Z']])
-
-        >>> convert_fields_mdy_folded_to_iso8601_unfolded([("12-01-2609", "23:59:01", "00:00:00"),])  # doctest: +NORMALIZE_WHITESPACE
-        (['date', 'satellite', 'overpass time'],
-         [['2609-12-01', 'aqua',  '2609-12-01T23:59:01Z'], 
-          ['2609-12-01', 'terra', '2609-12-01T00:00:00Z']])
-
-        
-        >>> convert_fields_mdy_folded_to_iso8601_unfolded([
-        ...     ("03-31-2013", "11:50:20", "14:45:05"),
-        ...     ("04-01-2013", "11:52:20", "14:43:05"),
-        ... ])  # doctest: +NORMALIZE_WHITESPACE
-        (['date', 'satellite', 'overpass time'],
-         [['2013-03-31', 'aqua',  '2013-03-31T11:50:20Z'], 
-          ['2013-03-31', 'terra', '2013-03-31T14:45:05Z'], 
-          ['2013-04-01', 'aqua',  '2013-04-01T11:52:20Z'], 
-          ['2013-04-01', 'terra', '2013-04-01T14:43:05Z']])
-        
-
-    """
-    new_fields = ["date", "satellite", "overpass time"]
-    new_rows = []
-    for row in rows:
-        date_mm_dd_yyyy, aqua_time, terra_time = row
-        m, d, y = map(int, date_mm_dd_yyyy.split("-"))
-        date_yyyy_mm_dd = datetime.date(y, m, d)
-        
-        new_rows.append([f"{date_yyyy_mm_dd}", "aqua", f"{date_yyyy_mm_dd}T{aqua_time}Z"])
-        new_rows.append([f"{date_yyyy_mm_dd}", "terra", f"{date_yyyy_mm_dd}T{terra_time}Z"])
-    
-    return new_fields, new_rows
 
 
 # Write CSV of all pass information.
@@ -184,7 +140,7 @@ def csvwrite(startdate, enddate, lat, lon, rows, outpath, fields=["Date", "Aqua 
     outpath_ = pathlib.Path(outpath)
     
     if outpath_.is_dir():
-        csv_name = f"passtimes_lat{lat}_lon{lon}_{''.join(startdate)}_{''.join(enddate)}.csv"
+        csv_name = f"passtimes_lat{lat}_lon{lon}_{startdate.strftime('%Y%m%d')}_{enddate.strftime('%Y%m%d')}.csv"
         filename = outpath_ / pathlib.Path(csv_name)
     elif outpath_.suffix == ".csv":
         filename = outpath_
@@ -197,54 +153,14 @@ def csvwrite(startdate, enddate, lat, lon, rows, outpath, fields=["Date", "Aqua 
         csvwriter.writerow(fields)
         csvwriter.writerows(rows)
 
-
-# Returns the date after a given date.
-def getNextDay(date):
-    month = int(date[0])
-    year = int(date[2])
-    day = int(date[1])
-    monthDays = daysInMonth(month, year)
-
-    nextmonth = month
-    nextday = day
-    nextyear = year
-
-    if day == monthDays:
-        nextday = 1
-        nextmonth += 1
-    else:
-        nextday += 1
-    if month == 12 and day == 31:
-        nextyear += 1
-        nextmonth = 1
-
-    nextyearstr = str(nextyear)
-
-    if nextday < 10:
-        nextdaystr = "0" + str(nextday)
-    else:
-        nextdaystr = str(nextday)
-    if nextmonth < 10:
-        nextmonthstr = "0" + str(nextmonth)
-    else:
-        nextmonthstr = str(nextmonth)
-
-    return [nextmonthstr, nextdaystr, nextyearstr]
-
-
-# Returns the number of days in a certain month.
-def daysInMonth(month, year):
-    if month in {1, 3, 5, 7, 8, 10, 12}:
-        return 31
-    if month == 2:
-        if year % 4 == 0:
-            return 29
-        return 28
-    return 30
-
-
-def get_epochs(dataset):
-    return [timestamp_to_utc(item["EPOCH"]) for item in dataset]
+def get_epochs(dataset) -> list[Time]:
+    ts = load.timescale()
+    times = []
+    for item in dataset:
+        dt = datetime.datetime.fromisoformat(item["EPOCH"]).replace(tzinfo=utc)
+        time = ts.from_datetime(dt)
+        times.append(time)
+    return times
 
 
 def getclosestepoch(t0, dataset):
@@ -268,24 +184,6 @@ def get_tli_lines(tle):
     return line1, line2
 
 
-def timestamp_to_utc(timestamp):
-    ts = load.timescale()
-    # Split the timestamp into date and time components
-    date_part, time_part = timestamp.split("T")
-
-    # Split the date part into year, month, and day
-    year, month, day = map(int, date_part.split("-"))
-
-    # Split the time part into hour, minute, and second
-    hour, minute, second = map(float, time_part.split(":"))
-
-    # Pass the parsed components to ts.utc
-    return ts.utc(year, month, day, hour, minute, second)
-
-
-def to_utc(t):
-    ts = load.timescale()
-    return ts.utc(int(t[2]), int(t[0]), int(t[1]))
 
 
 def get_Data(credentials: dict, start_date, end_date):
@@ -297,7 +195,7 @@ def get_Data(credentials: dict, start_date, end_date):
     uriBase = "https://www.space-track.org"
     requestLogin = "/ajaxauth/login"
     
-    epoch_range = f"{start_date[2]}-{start_date[0]}-{start_date[1]}--{end_date[2]}-{end_date[0]}-{end_date[1]}"
+    epoch_range = f"{start_date.isoformat()}--{end_date.isoformat()}"
 
     with requests.Session() as session:
         # Log in with username and password.
@@ -489,13 +387,13 @@ def main():
     )
     parser.add_argument(
         "--startdate",
-        type=_parsedate,
+        type=datetime.date.fromisoformat,
         dest="start_date",
         help="Start date in format YYYY-MM-DD",
     )
     parser.add_argument(
         "--enddate",
-        type=_parsedate,
+        type=datetime.date.fromisoformat,
         dest="end_date",
         help="End date in format YYYY-MM-DD",
     )
@@ -546,8 +444,8 @@ def main():
     )
 
     fields = ["date", "satellite", "overpass time"]
-    rows = [(row[f] for f in fields) for row in passtimes]
-    end_date_next = getNextDay(args.end_date)
+    rows = [[row["date"], row["satellite"], row["overpass_time"]] for row in passtimes]
+    end_date_next = args.end_date + datetime.timedelta(days=1)
     csvwrite(args.start_date, end_date_next, args.lat, args.lon, rows, args.csvoutpath, fields=fields)
 
 
