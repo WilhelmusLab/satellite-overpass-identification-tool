@@ -276,6 +276,19 @@ def to_utc(t):
     return ts.utc(int(t[2]), int(t[0]), int(t[1]))
 
 
+def _extract_spacetrack_error(payload):
+    """Return Space-Track error text when payload contains an error entry."""
+    if isinstance(payload, dict) and "error" in payload:
+        return str(payload["error"])
+
+    if isinstance(payload, list) and payload:
+        first_item = payload[0]
+        if isinstance(first_item, dict) and "error" in first_item:
+            return str(first_item["error"])
+
+    return None
+
+
 def get_Data(credentials: dict, start_date, end_date):
     """Fetch TLE data for all configured satellites.
     
@@ -305,7 +318,13 @@ def get_Data(credentials: dict, start_date, end_date):
                 print(f"Warning: Failed to fetch TLE data for {sat_name} (NORAD {norad_id}): {resp}")
                 satellite_data[sat_name] = []
             else:
-                satellite_data[sat_name] = json.loads(resp.text)
+                payload = json.loads(resp.text)
+                error_message = _extract_spacetrack_error(payload)
+                if error_message is not None:
+                    raise RuntimeError(
+                        f"Space-Track API error for {sat_name} (NORAD {norad_id}): {error_message}"
+                    )
+                satellite_data[sat_name] = payload
 
     return satellite_data
 
