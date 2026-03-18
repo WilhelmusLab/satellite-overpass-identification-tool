@@ -1,13 +1,14 @@
 """Integration tests for satellite overpass time retrieval."""
 
 import time
+import datetime as dt
 from collections import deque
 from datetime import datetime
 
 import pytest
 
 import satellite_overpass_identification_tool.app as app_module
-from satellite_overpass_identification_tool.app import get_passtimes, get_credentials, domain, _parsedate
+from satellite_overpass_identification_tool.app import get_passtimes, get_credentials, domain
 
 
 def _get_data_rate_limited(username, password, start_date, end_date, request_timestamps, max_requests_per_minute=15):
@@ -72,8 +73,8 @@ def test_get_passtimes(credentials, region, start_date, end_date, lat, lon, expe
     username, password = credentials
 
     passtimes = get_passtimes(
-        start_date=_parsedate(start_date),
-        end_date=_parsedate(end_date),
+        start_date=dt.date.fromisoformat(start_date),
+        end_date=dt.date.fromisoformat(end_date),
         lat=lat,
         lon=lon,
         SPACEUSER=username,
@@ -114,8 +115,8 @@ def test_get_passtimes_specific(credentials, region, date, lat, lon, expected_aq
     username, password = credentials
 
     passtimes = get_passtimes(
-        start_date=_parsedate(date),
-        end_date=_parsedate(date),
+        start_date=dt.date.fromisoformat(date),
+        end_date=dt.date.fromisoformat(date),
         lat=lat,
         lon=lon,
         SPACEUSER=username,
@@ -149,9 +150,9 @@ def validated_grid_data():
         pytest.skip("space-track.org credentials not available")
 
     date = "2025-05-15"
-    start_date = _parsedate(date)
-    end_date = _parsedate(date)
-    end_date_next = app_module.getNextDay(end_date)
+    start_date = dt.date.fromisoformat(date)
+    end_date = dt.date.fromisoformat(date)
+    end_date_next = end_date + dt.timedelta(days=1)
 
     request_timestamps = deque()
     satellite_data = _get_data_rate_limited(
@@ -570,8 +571,8 @@ def test_get_passtimes_validated_longitude_grid_parametrized(
     monkeypatch.setattr(app_module, "get_Data", lambda credentials, start_date, end_date: satellite_data)
 
     passtimes = get_passtimes(
-        start_date=_parsedate(date),
-        end_date=_parsedate(date),
+        start_date=dt.date.fromisoformat(date),
+        end_date=dt.date.fromisoformat(date),
         lat=lat,
         lon=lon,
         SPACEUSER=username,
