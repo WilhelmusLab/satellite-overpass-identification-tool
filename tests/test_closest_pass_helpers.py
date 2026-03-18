@@ -77,6 +77,46 @@ def test_process_passes_with_representative_terra_events(terra_20250515_events):
         for pass_dict in passes
     )
 
+    # Validate expected direction around known Terra overpass windows.
+    expected_windows = {
+        Direction.DESCENDING: ["18:30", "20:09", "21:46", "23:25"],
+        Direction.ASCENDING: ["00:22", "02:01", "03:39", "05:16"],
+    }
+    tolerance_minutes = 20
+
+    def _minutes_since_midnight(clock_time: str) -> int:
+        parsed = dt.datetime.strptime(clock_time, "%H:%M")
+        return parsed.hour * 60 + parsed.minute
+
+    def _pass_minutes(pass_dict: dict) -> int:
+        time_token = pass_dict["time"].split(" ")[3]  # HH:MM:SS
+        parsed = dt.datetime.strptime(time_token, "%H:%M:%S")
+        return parsed.hour * 60 + parsed.minute
+
+    def _circular_diff_minutes(a: int, b: int) -> int:
+        diff = abs(a - b)
+        return min(diff, 1440 - diff)
+
+    for expected_direction, windows in expected_windows.items():
+        direction_passes = [
+            pass_dict
+            for pass_dict in passes
+            if pass_dict.get("orbit_direction") == expected_direction
+        ]
+        assert direction_passes, f"No passes found for {expected_direction.value} direction"
+
+        for window in windows:
+            target_minutes = _minutes_since_midnight(window)
+            nearest_pass = min(
+                direction_passes,
+                key=lambda pass_dict: _circular_diff_minutes(target_minutes, _pass_minutes(pass_dict)),
+            )
+            nearest_delta = _circular_diff_minutes(target_minutes, _pass_minutes(nearest_pass))
+
+            assert nearest_delta <= tolerance_minutes, (
+                f"No {expected_direction.value} overpass found within {tolerance_minutes} minutes of {window}"
+            )
+
 
 @pytest.mark.integration
 def test_find_closest_pass_with_representative_terra_events(terra_20250515_events):
