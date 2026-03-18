@@ -22,15 +22,6 @@ EXPECTED_ROWS_80N_105W_2025_05_15 = [
 ]
 
 
-@pytest.fixture
-def credentials():
-    """Get space-track.org credentials or skip the test."""
-    username, password = app_module.get_credentials(app_module.domain, args=None)
-    if username is None or password is None:
-        pytest.skip("space-track.org credentials not available")
-    return username, password
-
-
 @pytest.mark.integration
 def test_main_regression_2025_05_15_80n_105w(credentials, monkeypatch, tmp_path):
     """main() should emit the known CSV rows for 2025-05-15 at 80N, -105E."""
