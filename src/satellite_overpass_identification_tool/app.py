@@ -21,7 +21,7 @@
 import requests
 import json
 import datetime
-from skyfield.api import wgs84, load, EarthSatellite
+from skyfield.api import wgs84, load, EarthSatellite, utc, Time
 import numpy as np
 import csv
 import math
@@ -107,8 +107,8 @@ def get_passtimes(start_date, end_date, lat, lon, SPACEUSER, SPACEPSWD):
         tomorrow = today + datetime.timedelta(days=1)
 
         # Get UTC time values of the start of today and the start of tomorrow.
-        t0 = to_utc(today)
-        t1 = to_utc(tomorrow)
+        t0 = ts.from_datetime(datetime.datetime.combine(today, datetime.datetime.min.time(), tzinfo=utc))
+        t1 = ts.from_datetime(datetime.datetime.combine(tomorrow, datetime.datetime.min.time(), tzinfo=utc))
 
         date_iso = today.isoformat()
 
@@ -153,8 +153,14 @@ def csvwrite(startdate, enddate, lat, lon, rows, outpath, fields=["Date", "Aqua 
         csvwriter.writerow(fields)
         csvwriter.writerows(rows)
 
-def get_epochs(dataset):
-    return [timestamp_to_utc(item["EPOCH"]) for item in dataset]
+def get_epochs(dataset) -> list[Time]:
+    ts = load.timescale()
+    times = []
+    for item in dataset:
+        dt = datetime.datetime.fromisoformat(item["EPOCH"]).replace(tzinfo=utc)
+        time = ts.from_datetime(dt)
+        times.append(time)
+    return times
 
 
 def getclosestepoch(t0, dataset):
@@ -178,27 +184,6 @@ def get_tli_lines(tle):
     return line1, line2
 
 
-def timestamp_to_utc(timestamp):
-    ts = load.timescale()
-    # Split the timestamp into date and time components
-    date_part, time_part = timestamp.split("T")
-
-    # Split the date part into year, month, and day
-    year, month, day = map(int, date_part.split("-"))
-
-    # Split the time part into hour, minute, and second
-    hour_str, minute_str, second_str = time_part.split(":")
-    hour = int(hour_str)
-    minute = int(minute_str)
-    second = float(second_str)
-
-    # Pass the parsed components to ts.utc
-    return ts.utc(year, month, day, hour, minute, second)
-
-
-def to_utc(t):
-    ts = load.timescale()
-    return ts.utc(t.year, t.month, t.day)
 
 
 def get_Data(credentials: dict, start_date, end_date):
