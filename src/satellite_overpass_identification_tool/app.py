@@ -58,15 +58,6 @@ e.g., `chmod 600 ~/.netrc` on Unix systems
 to keep your credentials secure.
 """
 
-# Define error.
-class MyError(Exception):
-    def __init___(self, args):
-        Exception.__init__(
-            self, "my exception was raised with arguments {0}".format(args)
-        )
-        self.args = args
-
-
 PASS_TIMES_DTYPE = np.dtype([
     ("date", "U10"),
     ("satellite", "U10"),
@@ -201,8 +192,11 @@ def get_Data(credentials: dict, start_date, end_date):
         # Log in with username and password.
         resp = session.post(uriBase + requestLogin, data=credentials)
         if resp.status_code != 200:
-            raise MyError(
-                resp, "POST fail on login. Your username/password may be incorrect. Check the ~/.netrc file or environment variables and try again."
+            raise requests.HTTPError(
+                "POST fail on login (status %s). Your username/password may be incorrect. "
+                "Check the ~/.netrc file or environment variables and try again."
+                % resp.status_code,
+                response=resp,
             )
 
         satellite_data = {}
