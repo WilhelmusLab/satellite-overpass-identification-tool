@@ -548,8 +548,8 @@ def main():
         SPACEPSWD=args.SPACEPSWD,
     )
 
-    fields = ["date", "satellite", "overpass time"]
-    rows = [(row[f] for f in fields) for row in passtimes]
+    fields = ["date", "satellite", "overpass_time"]
+    rows = [tuple(row[f] for f in fields) for row in passtimes]
     end_date_next = getNextDay(args.end_date)
     csvwrite(args.start_date, end_date_next, args.lat, args.lon, rows, args.csvoutpath, fields=fields)
 
