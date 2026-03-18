@@ -6,17 +6,7 @@ from datetime import datetime
 import pytest
 
 import satellite_overpass_identification_tool.app as app_module
-from satellite_overpass_identification_tool.app import get_passtimes, get_credentials, domain
-
-
-# Skip if credentials are not available
-@pytest.fixture
-def credentials():
-    """Get space-track.org credentials or skip the test."""
-    username, password = get_credentials(domain, args=None)
-    if username is None or password is None:
-        pytest.skip("space-track.org credentials not available")
-    return username, password
+from satellite_overpass_identification_tool.app import get_passtimes
 
 
 @pytest.mark.integration
@@ -111,11 +101,9 @@ def test_get_passtimes_specific(credentials, region, date, lat, lon, expected_aq
 
 
 @pytest.fixture(scope="module")
-def validated_grid_data(rate_limited_get_data):
+def validated_grid_data(rate_limited_get_data, credentials):
     """Fetch and cache one day of TLE data for the validated overpass grid."""
-    username, password = get_credentials(domain, args=None)
-    if username is None or password is None:
-        pytest.skip("space-track.org credentials not available")
+    username, password = credentials
 
     date = "2025-05-15"
     start_date = dt.date.fromisoformat(date)

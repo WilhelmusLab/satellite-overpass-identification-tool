@@ -57,6 +57,15 @@ def rate_limited_get_data():
     return _wrapper
 
 
+@pytest.fixture(scope="session")
+def credentials():
+    """Get space-track.org credentials or skip integration-style tests."""
+    username, password = app_module.get_credentials(app_module.domain, args=None)
+    if username is None or password is None:
+        pytest.skip("space-track.org credentials not available")
+    return username, password
+
+
 @pytest.fixture(autouse=True)
 def use_rate_limited_get_data(monkeypatch, rate_limited_get_data):
     """Route app.get_Data through the shared rate-limited wrapper for all tests."""

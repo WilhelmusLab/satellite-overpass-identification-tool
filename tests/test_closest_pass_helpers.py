@@ -7,10 +7,8 @@ import pytest
 from skyfield.api import EarthSatellite, load, utc, wgs84
 
 from satellite_overpass_identification_tool.app import (
-    domain,
     find_closest_pass,
     get_closest_pass_for_satellite,
-    get_credentials,
     get_tli_lines,
     getclosestepoch,
     process_passes,
@@ -18,11 +16,9 @@ from satellite_overpass_identification_tool.app import (
 
 
 @pytest.fixture(scope="module")
-def terra_20250515_events(rate_limited_get_data):
+def terra_20250515_events(rate_limited_get_data, credentials):
     """Build representative Terra events for 2025-05-15 at 80N, -120E."""
-    username, password = get_credentials(domain, args=None)
-    if username is None or password is None:
-        pytest.skip("space-track.org credentials not available")
+    username, password = credentials
 
     start_date = dt.date(2025, 5, 15)
     end_date = start_date + dt.timedelta(days=1)
