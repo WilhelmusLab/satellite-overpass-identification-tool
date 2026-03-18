@@ -29,17 +29,23 @@ import argparse
 import os
 import pathlib
 import netrc
-from enum import IntEnum
+from enum import Enum, IntEnum
+from typing import cast
 
 # URLs for space track login.
 domain = "space-track.org"
 uriBase = f"https://{domain}"
 requestLogin = "/ajaxauth/login"
 
+
+class Direction(Enum):
+    ASCENDING = "ascending"
+    DESCENDING = "descending"
+
 # Satellite configurations: NORAD catalog IDs and orbit direction for pass filtering
 SATELLITES = {
-    "aqua": {"norad_id": 27424, "ascending": True},
-    "terra": {"norad_id": 25994, "ascending": False},
+    "aqua": {"norad_id": 27424, "direction": Direction.ASCENDING},
+    "terra": {"norad_id": 25994, "direction": Direction.DESCENDING},
 }
 netrc_message = f"""
 {domain} SPACEUSER and SPACEPSWD can be set:
@@ -115,7 +121,7 @@ def get_passtimes(start_date, end_date, lat, lon, SPACEUSER, SPACEPSWD):
             satellite = EarthSatellite(tle_line1, tle_line2, sat_name.upper(), ts)
 
             closest_time = get_closest_pass_for_satellite(
-                satellite, aoi, t0, t1, ascending=sat_config["ascending"]
+                satellite, aoi, t0, t1, direction=sat_config["direction"]
             )
             if closest_time:
                 rows.append([date_iso, sat_name, f"{date_iso}T{closest_time}Z"])
@@ -253,17 +259,25 @@ def process_passes(satellite, aoi, events, times):
         overlat, overlon = wgs84.latlon_of(overpass_geocentric)
         setlat, setlon = wgs84.latlon_of(set_geocentric)
         _, _, distance = overpass_topocentric.altaz()
+        rise_lat = cast(float, riselat.degrees)
+        rise_lon = cast(float, riselon.degrees)
+        over_lat = cast(float, overlat.degrees)
+        over_lon = cast(float, overlon.degrees)
+        set_lat = cast(float, setlat.degrees)
+        set_lon = cast(float, setlon.degrees)
+        direction = Direction.ASCENDING if rise_lat < over_lat else Direction.DESCENDING
 
         passes.append(
             {
-                "rise_lat": riselat.degrees,
-                "rise_lon": riselon.degrees,
+                "rise_lat": rise_lat,
+                "rise_lon": rise_lon,
                 "distance": distance.km,
                 "time": overpass_t.utc_strftime("%Y %b %d %H:%M:%S"),
-                "over_lat": overlat.degrees,
-                "over_lon": overlon.degrees,
-                "set_lat": setlat.degrees,
-                "set_lon": setlon.degrees,
+                "over_lat": over_lat,
+                "over_lon": over_lon,
+                "set_lat": set_lat,
+                "set_lon": set_lon,
+                "orbit_direction": direction,
             }
         )
         i += 3
@@ -271,39 +285,43 @@ def process_passes(satellite, aoi, events, times):
     return passes
 
 
-def find_closest_pass(passes, ascending=True):
+def find_closest_pass(passes, direction=Direction.ASCENDING):
     """Return HH:MM:SS for the closest ascending/descending pass."""
     least_distance = math.inf
     closest_time = ""
+    target_direction = direction
 
     for pass_dict in passes:
         # Skip incomplete passes (no overpass data)
         if "distance" not in pass_dict or "over_lat" not in pass_dict:
             continue
 
-        if "rise_lat" in pass_dict and not np.isnan(pass_dict["rise_lat"]):
-            is_ascending = (
-                (pass_dict["rise_lat"] < pass_dict["over_lat"])
-                if ascending
-                else (pass_dict["rise_lat"] > pass_dict["over_lat"])
-            )
-            if is_ascending and pass_dict["distance"] < least_distance:
-                least_distance = pass_dict["distance"]
-                closest_time = pass_dict["time"]
-        elif "set_lat" in pass_dict:
-            is_ascending = (
-                (pass_dict["set_lat"] > pass_dict["over_lat"])
-                if ascending
-                else (pass_dict["set_lat"] < pass_dict["over_lat"])
-            )
-            if is_ascending and pass_dict["distance"] < least_distance:
-                least_distance = pass_dict["distance"]
-                closest_time = pass_dict["time"]
+        orbit_direction = pass_dict.get("orbit_direction")
+        if isinstance(orbit_direction, str):
+            normalized = orbit_direction.lower()
+            if normalized == "ascending":
+                orbit_direction = Direction.ASCENDING
+            elif normalized == "descending":
+                orbit_direction = Direction.DESCENDING
+        # Fallback for older pass dictionaries without explicit orbit direction.
+        if orbit_direction is None and "rise_lat" in pass_dict and not np.isnan(pass_dict["rise_lat"]):
+            orbit_direction = Direction.ASCENDING if pass_dict["rise_lat"] < pass_dict["over_lat"] else Direction.DESCENDING
+
+        if orbit_direction == target_direction and pass_dict["distance"] < least_distance:
+            least_distance = pass_dict["distance"]
+            closest_time = pass_dict["time"]
 
     return closest_time.split(" ")[3] if closest_time else ""
 
 
-def get_closest_pass_for_satellite(satellite, aoi, t0, t1, ascending=True, altitude_degrees=30):
+def get_closest_pass_for_satellite(
+    satellite,
+    aoi,
+    t0,
+    t1,
+    direction=Direction.ASCENDING,
+    altitude_degrees=30,
+):
     """Find the closest pass time for a single satellite.
     
     Args:
@@ -311,7 +329,7 @@ def get_closest_pass_for_satellite(satellite, aoi, t0, t1, ascending=True, altit
         aoi: Area of interest (wgs84.latlon)
         t0: Start time
         t1: End time
-        ascending: Whether to filter for ascending (True) or descending (False) passes
+        direction: Whether to filter for ascending or descending passes
         altitude_degrees: Minimum altitude for pass detection
     
     Returns:
@@ -319,7 +337,7 @@ def get_closest_pass_for_satellite(satellite, aoi, t0, t1, ascending=True, altit
     """
     times, events = satellite.find_events(aoi, t0, t1, altitude_degrees=altitude_degrees)
     passes = process_passes(satellite=satellite, aoi=aoi, events=events, times=times)
-    return find_closest_pass(passes, ascending=ascending)
+    return find_closest_pass(passes, direction=direction)
 
 
 def get_credentials(domain, args=None):

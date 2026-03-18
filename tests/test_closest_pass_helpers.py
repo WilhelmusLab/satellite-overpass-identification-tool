@@ -7,6 +7,7 @@ import pytest
 from skyfield.api import EarthSatellite, load, utc, wgs84
 
 from satellite_overpass_identification_tool.app import (
+    Direction,
     find_closest_pass,
     get_closest_pass_for_satellite,
     get_tli_lines,
@@ -69,7 +70,10 @@ def test_process_passes_with_representative_terra_events(terra_20250515_events):
     assert isinstance(passes, list)
     assert passes
     assert any(
-        "distance" in pass_dict and "time" in pass_dict and "over_lat" in pass_dict
+        "distance" in pass_dict
+        and "time" in pass_dict
+        and "over_lat" in pass_dict
+        and pass_dict.get("orbit_direction") in {Direction.ASCENDING, Direction.DESCENDING}
         for pass_dict in passes
     )
 
@@ -84,7 +88,7 @@ def test_find_closest_pass_with_representative_terra_events(terra_20250515_event
         times=terra_20250515_events["times"],
     )
 
-    closest_time = find_closest_pass(passes, ascending=False)
+    closest_time = find_closest_pass(passes, direction=Direction.DESCENDING)
     assert closest_time
     assert re.fullmatch(r"\d{2}:\d{2}:\d{2}", closest_time)
 
@@ -93,6 +97,6 @@ def test_find_closest_pass_with_representative_terra_events(terra_20250515_event
         aoi=terra_20250515_events["aoi"],
         t0=terra_20250515_events["t0"],
         t1=terra_20250515_events["t1"],
-        ascending=False,
+        direction=Direction.DESCENDING,
     )
     assert closest_time == wrapper_time
