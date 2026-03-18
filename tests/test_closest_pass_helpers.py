@@ -11,7 +11,6 @@ from satellite_overpass_identification_tool.app import (
     find_closest_pass,
     get_closest_pass_for_satellite,
     get_credentials,
-    get_Data,
     get_tli_lines,
     getclosestepoch,
     process_passes,
@@ -19,7 +18,7 @@ from satellite_overpass_identification_tool.app import (
 
 
 @pytest.fixture(scope="module")
-def terra_20250515_events():
+def terra_20250515_events(rate_limited_get_data):
     """Build representative Terra events for 2025-05-15 at 80N, -120E."""
     username, password = get_credentials(domain, args=None)
     if username is None or password is None:
@@ -28,7 +27,7 @@ def terra_20250515_events():
     start_date = dt.date(2025, 5, 15)
     end_date = start_date + dt.timedelta(days=1)
 
-    satellite_data = get_Data(
+    satellite_data = rate_limited_get_data(
         credentials={"identity": username, "password": password},
         start_date=start_date,
         end_date=end_date,
