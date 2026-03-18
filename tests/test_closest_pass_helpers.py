@@ -58,7 +58,7 @@ def terra_20250515_events(rate_limited_get_data, credentials):
 
 
 @pytest.mark.integration
-def test_process_passes_with_representative_terra_events(terra_20250515_events):
+def test_process_passes_with_representative_terra_events(terra_20250515_events, pass_times_tolerance_minutes=20):
     """process_passes should return parsed overpass dictionaries for representative Terra events."""
     passes = process_passes(
         satellite=terra_20250515_events["satellite"],
@@ -77,45 +77,23 @@ def test_process_passes_with_representative_terra_events(terra_20250515_events):
         for pass_dict in passes
     )
 
-    # Validate expected direction around known Terra overpass windows.
-    expected_windows = {
-        Direction.DESCENDING: ["18:30", "20:09", "21:46", "23:25"],
-        Direction.ASCENDING: ["00:22", "02:01", "03:39", "05:16"],
-    }
-    tolerance_minutes = 20
+    expected_passes = [
+        ("00:22:00", Direction.ASCENDING),
+        ("02:01:00", Direction.ASCENDING),
+        ("03:39:00", Direction.ASCENDING),
+        ("05:16:00", Direction.ASCENDING),
+        ("18:30:00", Direction.DESCENDING),
+        ("20:09:00", Direction.DESCENDING),
+        ("21:46:00", Direction.DESCENDING),
+        ("23:23:00", Direction.DESCENDING),
+    ]
 
-    def _minutes_since_midnight(clock_time: str) -> int:
-        parsed = dt.datetime.strptime(clock_time, "%H:%M")
-        return parsed.hour * 60 + parsed.minute
-
-    def _pass_minutes(pass_dict: dict) -> int:
-        time_token = pass_dict["time"].split(" ")[3]  # HH:MM:SS
-        parsed = dt.datetime.strptime(time_token, "%H:%M:%S")
-        return parsed.hour * 60 + parsed.minute
-
-    def _circular_diff_minutes(a: int, b: int) -> int:
-        diff = abs(a - b)
-        return min(diff, 1440 - diff)
-
-    for expected_direction, windows in expected_windows.items():
-        direction_passes = [
-            pass_dict
-            for pass_dict in passes
-            if pass_dict.get("orbit_direction") == expected_direction
-        ]
-        assert direction_passes, f"No passes found for {expected_direction.value} direction"
-
-        for window in windows:
-            target_minutes = _minutes_since_midnight(window)
-            nearest_pass = min(
-                direction_passes,
-                key=lambda pass_dict: _circular_diff_minutes(target_minutes, _pass_minutes(pass_dict)),
-            )
-            nearest_delta = _circular_diff_minutes(target_minutes, _pass_minutes(nearest_pass))
-
-            assert nearest_delta <= tolerance_minutes, (
-                f"No {expected_direction.value} overpass found within {tolerance_minutes} minutes of {window}"
-            )
+    for expectation, actual in zip(expected_passes, passes):
+        expected_time, expected_direction = expectation
+        actual_time = dt.datetime.fromtimestamp(actual["time"]).strftime("%H:%M:%S")
+        actual_direction = actual.get("orbit_direction")
+        assert actual_direction == expected_direction, f"Expected direction {expected_direction.value} but got {actual_direction.value if actual_direction else 'None'}"
+        assert abs((dt.datetime.strptime(actual_time, "%H:%M:%S") - dt.datetime.strptime(expected_time, "%H:%M:%S")).total_seconds()) <= pass_times_tolerance_minutes * 60, f"Expected time {expected_time} but got {actual_time}"
 
 
 @pytest.mark.integration
