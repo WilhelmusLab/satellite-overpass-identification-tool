@@ -12,12 +12,12 @@ EXPECTED_ROWS_80N_105W_2025_05_15 = [
     {
         "date": "2025-05-15",
         "satellite": "aqua",
-        "overpass_time": "2025-05-15T18:07:07Z",
+        "overpass time": "2025-05-15T18:07:07Z",
     },
     {
         "date": "2025-05-15",
         "satellite": "terra",
-        "overpass_time": "2025-05-15T20:08:03Z",
+        "overpass time": "2025-05-15T20:08:03Z",
     },
 ]
 
