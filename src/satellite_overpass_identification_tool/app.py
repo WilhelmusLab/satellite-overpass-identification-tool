@@ -297,11 +297,13 @@ def get_closest_pass_for_satellite(satellite, aoi, t0, t1, ascending=True, altit
                     least_distance = pass_dict["distance"]
                     closest_time = pass_dict["time"]
 
-        return closest_time.split(" ")[3] if closest_time else ""
+        result = closest_time.split(" ")[3] if closest_time else ""
+        return result
 
     times, events = satellite.find_events(aoi, t0, t1, altitude_degrees=altitude_degrees)
     passes = process_passes(satellite, events, times)
-    return find_closest_pass(passes, ascending=ascending)
+    closest_pass = find_closest_pass(passes, ascending=ascending)
+    return closest_pass
 
 
 def get_credentials(domain, args=None):
