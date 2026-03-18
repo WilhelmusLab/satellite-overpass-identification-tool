@@ -260,6 +260,7 @@ def process_passes(satellite, aoi, events, times):
         overlat, overlon = wgs84.latlon_of(overpass_geocentric)
         setlat, setlon = wgs84.latlon_of(set_geocentric)
         _, _, distance = overpass_topocentric.altaz()
+        
         direction = find_orbit_direction(satellite, overpass_t)
 
         passes.append(
