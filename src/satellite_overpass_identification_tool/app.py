@@ -214,6 +214,81 @@ def get_Data(credentials: dict, start_date, end_date):
     return satellite_data
 
 
+def process_passes(satellite, aoi, events, times):
+    """Build pass dictionaries from Skyfield event streams."""
+    passes = []
+    pass_dict = {}
+    difference = satellite - aoi
+
+    for i, (event, ti) in enumerate(zip(events, times)):
+        geocentric = satellite.at(ti)
+        topocentric = difference.at(ti)
+
+        if event == 0:  # Rise
+            pass_dict = {}
+            riselat, riselon = wgs84.latlon_of(geocentric)
+            pass_dict["rise_lat"] = riselat.degrees
+            pass_dict["rise_lon"] = riselon.degrees
+
+        elif event == 1:  # Overpass
+            alt, az, distance = topocentric.altaz()
+            pass_dict["distance"] = distance.km
+            pass_dict["time"] = ti.utc_strftime("%Y %b %d %H:%M:%S")
+            overlat, overlon = wgs84.latlon_of(geocentric)
+            pass_dict["over_lat"] = overlat.degrees
+            pass_dict["over_lon"] = overlon.degrees
+
+            # Handle edge case for first overpass without prior rise
+            if i == 0:
+                pass_dict["rise_lat"] = float("nan")
+                pass_dict["rise_lon"] = float("nan")
+            # Handle edge case for last overpass without subsequent set
+            if i == len(events) - 1:
+                pass_dict["set_lat"] = float("nan")
+                pass_dict["set_lon"] = float("nan")
+                passes.append(pass_dict)
+
+        else:  # Set
+            setlat, setlon = wgs84.latlon_of(geocentric)
+            pass_dict["set_lat"] = setlat.degrees
+            pass_dict["set_lon"] = setlon.degrees
+            passes.append(pass_dict)
+
+    return passes
+
+
+def find_closest_pass(passes, ascending=True):
+    """Return HH:MM:SS for the closest ascending/descending pass."""
+    least_distance = math.inf
+    closest_time = ""
+
+    for pass_dict in passes:
+        # Skip incomplete passes (no overpass data)
+        if "distance" not in pass_dict or "over_lat" not in pass_dict:
+            continue
+
+        if "rise_lat" in pass_dict and not np.isnan(pass_dict["rise_lat"]):
+            is_ascending = (
+                (pass_dict["rise_lat"] < pass_dict["over_lat"])
+                if ascending
+                else (pass_dict["rise_lat"] > pass_dict["over_lat"])
+            )
+            if is_ascending and pass_dict["distance"] < least_distance:
+                least_distance = pass_dict["distance"]
+                closest_time = pass_dict["time"]
+        elif "set_lat" in pass_dict:
+            is_ascending = (
+                (pass_dict["set_lat"] > pass_dict["over_lat"])
+                if ascending
+                else (pass_dict["set_lat"] < pass_dict["over_lat"])
+            )
+            if is_ascending and pass_dict["distance"] < least_distance:
+                least_distance = pass_dict["distance"]
+                closest_time = pass_dict["time"]
+
+    return closest_time.split(" ")[3] if closest_time else ""
+
+
 def get_closest_pass_for_satellite(satellite, aoi, t0, t1, ascending=True, altitude_degrees=30):
     """Find the closest pass time for a single satellite.
     
@@ -228,79 +303,8 @@ def get_closest_pass_for_satellite(satellite, aoi, t0, t1, ascending=True, altit
     Returns:
         str: Time of closest pass in HH:MM:SS format, or empty string if no pass found
     """
-    def process_passes(satellite, events, times):
-        passes = []
-        pass_dict = {}
-
-        for i, (event, ti) in enumerate(zip(events, times)):
-            geocentric = satellite.at(ti)
-            difference = satellite - aoi
-            topocentric = difference.at(ti)
-
-            if event == 0:  # Rise
-                pass_dict = {}
-                riselat, riselon = wgs84.latlon_of(geocentric)
-                pass_dict["rise_lat"] = riselat.degrees
-                pass_dict["rise_lon"] = riselon.degrees
-
-            elif event == 1:  # Overpass
-                alt, az, distance = topocentric.altaz()
-                pass_dict["distance"] = distance.km
-                pass_dict["time"] = ti.utc_strftime("%Y %b %d %H:%M:%S")
-                overlat, overlon = wgs84.latlon_of(geocentric)
-                pass_dict["over_lat"] = overlat.degrees
-                pass_dict["over_lon"] = overlon.degrees
-
-                # Handle edge case for first overpass without prior rise
-                if i == 0:
-                    pass_dict["rise_lat"] = float("nan")
-                    pass_dict["rise_lon"] = float("nan")
-                # Handle edge case for last overpass without subsequent set
-                if i == len(events) - 1:
-                    pass_dict["set_lat"] = float("nan")
-                    pass_dict["set_lon"] = float("nan")
-                    passes.append(pass_dict)
-
-            else:  # Set
-                setlat, setlon = wgs84.latlon_of(geocentric)
-                pass_dict["set_lat"] = setlat.degrees
-                pass_dict["set_lon"] = setlon.degrees
-                passes.append(pass_dict)
-
-        return passes
-
-    def find_closest_pass(passes, ascending=True):
-        least_distance = math.inf
-        closest_time = ""
-
-        for pass_dict in passes:
-            # Skip incomplete passes (no overpass data)
-            if "distance" not in pass_dict or "over_lat" not in pass_dict:
-                continue
-            
-            if "rise_lat" in pass_dict and not np.isnan(pass_dict["rise_lat"]):
-                is_ascending = (
-                    (pass_dict["rise_lat"] < pass_dict["over_lat"])
-                    if ascending
-                    else (pass_dict["rise_lat"] > pass_dict["over_lat"])
-                )
-                if is_ascending and pass_dict["distance"] < least_distance:
-                    least_distance = pass_dict["distance"]
-                    closest_time = pass_dict["time"]
-            elif "set_lat" in pass_dict:
-                is_ascending = (
-                    (pass_dict["set_lat"] > pass_dict["over_lat"])
-                    if ascending
-                    else (pass_dict["set_lat"] < pass_dict["over_lat"])
-                )
-                if is_ascending and pass_dict["distance"] < least_distance:
-                    least_distance = pass_dict["distance"]
-                    closest_time = pass_dict["time"]
-
-        return closest_time.split(" ")[3] if closest_time else ""
-
     times, events = satellite.find_events(aoi, t0, t1, altitude_degrees=altitude_degrees)
-    passes = process_passes(satellite, events, times)
+    passes = process_passes(satellite=satellite, aoi=aoi, events=events, times=times)
     return find_closest_pass(passes, ascending=ascending)
 
 
