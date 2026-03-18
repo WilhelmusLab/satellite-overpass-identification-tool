@@ -195,13 +195,12 @@ OVERPASS_VALIDATION_CASES = [
         "aqua",
         "2025-05-15T18:07:44Z", # checked
     ),
-    pytest.param(
+    (
         "2025-05-15",
         80,
         -120.0,
         "terra",
         "2025-05-15T21:46:30Z",  # checked
-        marks=pytest.mark.xfail(reason="Known broken validated case: terra at lon -120.0"),
     ),
     (
         "2025-05-15",
@@ -329,13 +328,12 @@ OVERPASS_VALIDATION_CASES = [
         "terra",
         "2025-05-15T11:54:57Z", # checked
     ),
-    pytest.param(
+    (
         "2025-05-15",
         80,
         30.0,
         "aqua",
         "2025-05-15T08:16:00Z",  # checked
-        marks=pytest.mark.xfail(reason="Known broken validated case: aqua at lon 30.0"),
     ),
     (
         "2025-05-15",
