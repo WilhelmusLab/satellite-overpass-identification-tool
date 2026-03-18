@@ -288,29 +288,15 @@ def process_passes(satellite, aoi, events, times):
 def find_closest_pass(passes, direction=Direction.ASCENDING):
     """Return HH:MM:SS for the closest ascending/descending pass."""
     least_distance = math.inf
-    closest_time = ""
+    closest_time = None
     target_direction = direction
+    filtered_passes = [pass_dict for pass_dict in passes if pass_dict["orbit_direction"] == target_direction]
 
-    for pass_dict in passes:
-        # Skip incomplete passes (no overpass data)
-        if "distance" not in pass_dict or "over_lat" not in pass_dict:
-            continue
-
-        orbit_direction = pass_dict.get("orbit_direction")
-        if isinstance(orbit_direction, str):
-            normalized = orbit_direction.lower()
-            if normalized == "ascending":
-                orbit_direction = Direction.ASCENDING
-            elif normalized == "descending":
-                orbit_direction = Direction.DESCENDING
-        # Fallback for older pass dictionaries without explicit orbit direction.
-        if orbit_direction is None and "rise_lat" in pass_dict and not np.isnan(pass_dict["rise_lat"]):
-            orbit_direction = Direction.ASCENDING if pass_dict["rise_lat"] < pass_dict["over_lat"] else Direction.DESCENDING
-
-        if orbit_direction == target_direction and pass_dict["distance"] < least_distance:
+    for pass_dict in filtered_passes:
+        if pass_dict["distance"] < least_distance:
             least_distance = pass_dict["distance"]
             closest_time = pass_dict["time"]
-
+        
     return closest_time.split(" ")[3] if closest_time else ""
 
 
