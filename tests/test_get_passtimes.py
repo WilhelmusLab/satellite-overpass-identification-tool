@@ -11,7 +11,7 @@ import satellite_overpass_identification_tool.app as app_module
 from satellite_overpass_identification_tool.app import get_passtimes, get_credentials, domain
 
 
-def _get_data_rate_limited(username, password, start_date, end_date, request_timestamps, max_requests_per_minute=15):
+def _get_data_rate_limited(get_data_func, credentials, start_date, end_date, request_timestamps, max_requests_per_minute=15):
     """Call get_Data while limiting estimated API requests to max_requests_per_minute.
 
     app_module.get_Data performs one login request and one request per satellite,
@@ -31,8 +31,8 @@ def _get_data_rate_limited(username, password, start_date, end_date, request_tim
         sleep_seconds = window_seconds - (now - request_timestamps[0])
         time.sleep(max(0.01, sleep_seconds))
 
-    satellite_data = app_module.get_Data(
-        credentials={"identity": username, "password": password},
+    satellite_data = get_data_func(
+        credentials=credentials,
         start_date=start_date,
         end_date=end_date,
     )
@@ -49,6 +49,31 @@ def credentials():
     if username is None or password is None:
         pytest.skip("space-track.org credentials not available")
     return username, password
+
+
+@pytest.fixture(scope="module")
+def rate_limited_get_data():
+    """Provide a shared rate-limited get_Data wrapper for this module."""
+    request_timestamps = deque()
+    original_get_data = app_module.get_Data
+
+    def _wrapper(credentials, start_date, end_date):
+        return _get_data_rate_limited(
+            get_data_func=original_get_data,
+            credentials=credentials,
+            start_date=start_date,
+            end_date=end_date,
+            request_timestamps=request_timestamps,
+            max_requests_per_minute=15,
+        )
+
+    return _wrapper
+
+
+@pytest.fixture(autouse=True)
+def use_rate_limited_get_data(monkeypatch, rate_limited_get_data):
+    """Ensure all get_passtimes calls in this module use the shared rate-limited get_Data."""
+    monkeypatch.setattr(app_module, "get_Data", rate_limited_get_data)
 
 
 @pytest.mark.integration
@@ -143,7 +168,7 @@ def test_get_passtimes_specific(credentials, region, date, lat, lon, expected_aq
 
 
 @pytest.fixture(scope="module")
-def validated_grid_data():
+def validated_grid_data(rate_limited_get_data):
     """Fetch and cache one day of TLE data for the validated overpass grid."""
     username, password = get_credentials(domain, args=None)
     if username is None or password is None:
@@ -154,14 +179,10 @@ def validated_grid_data():
     end_date = dt.date.fromisoformat(date)
     end_date_next = end_date + dt.timedelta(days=1)
 
-    request_timestamps = deque()
-    satellite_data = _get_data_rate_limited(
-        username=username,
-        password=password,
+    satellite_data = rate_limited_get_data(
+        credentials={"identity": username, "password": password},
         start_date=start_date,
         end_date=end_date_next,
-        request_timestamps=request_timestamps,
-        max_requests_per_minute=15,
     )
 
     for satellite_name in ("aqua", "terra"):
