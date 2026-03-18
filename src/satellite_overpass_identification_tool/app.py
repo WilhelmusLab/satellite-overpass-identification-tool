@@ -260,24 +260,18 @@ def process_passes(satellite, aoi, events, times):
         overlat, overlon = wgs84.latlon_of(overpass_geocentric)
         setlat, setlon = wgs84.latlon_of(set_geocentric)
         _, _, distance = overpass_topocentric.altaz()
-        rise_lat = cast(float, riselat.degrees)
-        rise_lon = cast(float, riselon.degrees)
-        over_lat = cast(float, overlat.degrees)
-        over_lon = cast(float, overlon.degrees)
-        set_lat = cast(float, setlat.degrees)
-        set_lon = cast(float, setlon.degrees)
         direction = find_orbit_direction(satellite, overpass_t)
 
         passes.append(
             {
-                "rise_lat": rise_lat,
-                "rise_lon": rise_lon,
+                "rise_lat": riselat.degrees,
+                "rise_lon": riselon.degrees,
                 "distance": distance.km,
                 "time": overpass_t,
-                "over_lat": over_lat,
-                "over_lon": over_lon,
-                "set_lat": set_lat,
-                "set_lon": set_lon,
+                "over_lat": overlat.degrees,
+                "over_lon": overlon.degrees,
+                "set_lat": setlat.degrees,
+                "set_lon": setlon.degrees,
                 "orbit_direction": direction,
             }
         )
