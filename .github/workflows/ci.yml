@@ -6,6 +6,10 @@ on:
   pull_request:
     branches:
 
+concurrency:
+  group: ci-${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   test:
     runs-on: ubuntu-latest
