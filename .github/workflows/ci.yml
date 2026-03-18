@@ -23,4 +23,7 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Run tests
+        env:
+          SPACEUSER: ${{ vars.SPACEUSER }}
+          SPACEPSWD: ${{ secrets.SPACEPSWD }}
         run: pytest
