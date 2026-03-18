@@ -42,6 +42,12 @@ class Direction(Enum):
     ASCENDING = "ascending"
     DESCENDING = "descending"
 
+class PassEvent(IntEnum):
+    RISE = 0
+    OVERPASS = 1
+    SET = 2
+
+
 # Satellite configurations: NORAD catalog IDs and orbit direction for pass filtering
 SATELLITES = {
     "aqua": {"norad_id": 27424, "direction": Direction.ASCENDING},
@@ -220,11 +226,6 @@ def get_Data(credentials: dict, start_date, end_date):
 
     return satellite_data
 
-
-class PassEvent(IntEnum):
-    RISE = 0
-    OVERPASS = 1
-    SET = 2
 
 def process_passes(satellite, aoi, events, times):
     """Build pass dictionaries from Skyfield event streams.
