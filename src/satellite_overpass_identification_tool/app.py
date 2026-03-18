@@ -265,22 +265,7 @@ def process_passes(satellite, aoi, events, times):
         over_lon = cast(float, overlon.degrees)
         set_lat = cast(float, setlat.degrees)
         set_lon = cast(float, setlon.degrees)
-        # Determine direction from local latitude trend around overpass time.
-        delta_seconds = 30.
-        seconds_per_day = 86400.
-        delta_days = delta_seconds / seconds_per_day
-        ts = overpass_t.ts
-        before_overpass = ts.tt_jd(overpass_t.tt - delta_days)
-        after_overpass = ts.tt_jd(overpass_t.tt + delta_days)
-        before_lat, _ = wgs84.latlon_of(satellite.at(before_overpass))
-        after_lat, _ = wgs84.latlon_of(satellite.at(after_overpass))
-        before_lat_deg = cast(float, before_lat.degrees)
-        after_lat_deg = cast(float, after_lat.degrees)
-        direction = (
-            Direction.ASCENDING
-            if after_lat_deg > before_lat_deg
-            else Direction.DESCENDING
-        )
+        direction = find_orbit_direction(satellite, overpass_t)
 
         passes.append(
             {
@@ -299,6 +284,24 @@ def process_passes(satellite, aoi, events, times):
 
     return passes
 
+
+def find_orbit_direction(satellite, overpass_t):
+    delta_seconds = 30.
+    seconds_per_day = 86400.
+    delta_days = delta_seconds / seconds_per_day
+    ts = overpass_t.ts
+    before_overpass = ts.tt_jd(overpass_t.tt - delta_days)
+    after_overpass = ts.tt_jd(overpass_t.tt + delta_days)
+    before_lat, _ = wgs84.latlon_of(satellite.at(before_overpass))
+    after_lat, _ = wgs84.latlon_of(satellite.at(after_overpass))
+    before_lat_deg = cast(float, before_lat.degrees)
+    after_lat_deg = cast(float, after_lat.degrees)
+    direction = (
+        Direction.ASCENDING
+        if after_lat_deg > before_lat_deg
+        else Direction.DESCENDING
+    )
+    return direction
 
 def find_closest_pass(passes, direction=Direction.ASCENDING):
     """Return HH:MM:SS for the closest ascending/descending pass."""
