@@ -11,7 +11,7 @@ import satellite_overpass_identification_tool.app as app_module
 @pytest.fixture(scope="session")
 def domain():
     """Domain to use for testing get_credentials and get_Data."""
-    return "www.space-track.org"
+    return "for-testing-only.space-track.org"
 
 def _get_data_rate_limited(
     get_data_func,
