@@ -8,11 +8,17 @@ import pytest
 import satellite_overpass_identification_tool.app as app_module
 
 
+@pytest.fixture(scope="session")
+def domain():
+    """Domain to use for testing get_credentials and get_Data."""
+    return "www.space-track.org"
+
 def _get_data_rate_limited(
     get_data_func,
     credentials,
     start_date,
     end_date,
+    domain,
     request_timestamps,
     max_requests_per_minute=15,
     rate_limit_error_state=None,
@@ -44,6 +50,7 @@ def _get_data_rate_limited(
             credentials=credentials,
             start_date=start_date,
             end_date=end_date,
+            domain=domain,
         )
     except Exception as exc:
         message = str(exc)
@@ -62,12 +69,13 @@ def rate_limited_get_data():
     rate_limit_error_state = {"message": None}
     original_get_data = app_module.get_Data
 
-    def _wrapper(credentials, start_date, end_date):
+    def _wrapper(credentials, start_date, end_date, domain):
         return _get_data_rate_limited(
             get_data_func=original_get_data,
             credentials=credentials,
             start_date=start_date,
             end_date=end_date,
+            domain=domain,
             request_timestamps=request_timestamps,
             max_requests_per_minute=15,
             rate_limit_error_state=rate_limit_error_state,
@@ -83,10 +91,9 @@ def use_rate_limited_get_data(monkeypatch, rate_limited_get_data):
 
 
 @pytest.fixture(scope="session")
-def credentials():
-    """Get space-track.org credentials or skip integration-style tests."""
-    username, password = app_module.get_credentials(
-        app_module.domain, args=None)
+def credentials(domain):
+    """Get space-track.org credentials or skip tests."""
+    username, password = app_module.get_credentials(domain, args=None)
     if username is None or password is None:
-        pytest.skip("space-track.org credentials not available")
+        pytest.skip(f"{domain} credentials not available")
     return username, password

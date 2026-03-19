@@ -8,7 +8,6 @@ import pytest
 import satellite_overpass_identification_tool.app as app_module
 from satellite_overpass_identification_tool.app import get_passtimes
 
-
 @pytest.mark.integration
 @pytest.mark.parametrize(
     "region,start_date,end_date,lat,lon,expected_rows",
@@ -26,7 +25,7 @@ from satellite_overpass_identification_tool.app import get_passtimes
         pytest.param("kara_sea", "2023-12-01", "2023-12-31", 77, 77, 62, id="kara_sea: 2023-12"),
     ],
 )
-def test_get_passtimes(credentials, region, start_date, end_date, lat, lon, expected_rows):
+def test_get_passtimes(credentials, region, start_date, end_date, lat, lon, expected_rows, domain):
     """Load overpass times for given date range and coordinates."""
     username, password = credentials
 
@@ -37,6 +36,7 @@ def test_get_passtimes(credentials, region, start_date, end_date, lat, lon, expe
         lon=lon,
         SPACEUSER=username,
         SPACEPSWD=password,
+        domain=domain,
     )
 
     assert len(passtimes) == expected_rows, f"Expected {expected_rows} data rows, got {len(passtimes)}"
@@ -68,7 +68,7 @@ def test_get_passtimes(credentials, region, start_date, end_date, lat, lon, expe
         pytest.param("kara_sea", "2023-12-01", 77, 77, "2023-12-01T06:48:37Z", "2023-12-01T07:05:39Z", id="kara_sea: 2023-12-01"),
     ],
 )
-def test_get_passtimes_specific(credentials, region, date, lat, lon, expected_aqua, expected_terra):
+def test_get_passtimes_specific(credentials, region, date, lat, lon, expected_aqua, expected_terra, domain):
     """Verify specific overpass times for a given date and coordinates."""
     username, password = credentials
 
@@ -79,6 +79,7 @@ def test_get_passtimes_specific(credentials, region, date, lat, lon, expected_aq
         lon=lon,
         SPACEUSER=username,
         SPACEPSWD=password,
+        domain=domain,
     )
 
     # Extract rows by satellite
@@ -101,7 +102,7 @@ def test_get_passtimes_specific(credentials, region, date, lat, lon, expected_aq
 
 
 @pytest.fixture(scope="module")
-def validated_grid_data(rate_limited_get_data, credentials):
+def validated_grid_data(rate_limited_get_data, credentials, domain):
     """Fetch and cache one day of TLE data for the validated overpass grid."""
     username, password = credentials
 
@@ -114,6 +115,7 @@ def validated_grid_data(rate_limited_get_data, credentials):
         credentials={"identity": username, "password": password},
         start_date=start_date,
         end_date=end_date_next,
+        domain=domain,
     )
 
     for satellite_name in ("aqua", "terra"):
@@ -511,6 +513,7 @@ def test_get_passtimes_validated_longitude_grid_parametrized(
     lon,
     satellite,
     expected_time,
+    domain,
     tolerance_seconds=120,
 ):
     """Validate each satellite overpass is within ~2 minutes of expected_time."""
@@ -527,6 +530,7 @@ def test_get_passtimes_validated_longitude_grid_parametrized(
         lon=lon,
         SPACEUSER=username,
         SPACEPSWD=password,
+        domain=domain,
     )
 
     sat_rows = passtimes[passtimes["satellite"] == satellite]

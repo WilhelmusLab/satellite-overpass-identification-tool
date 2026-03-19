@@ -9,7 +9,7 @@ import conftest as test_conftest
 import satellite_overpass_identification_tool.app as app_module
 
 
-def test_get_data_raises_when_payload_contains_error(monkeypatch):
+def test_get_data_raises_when_payload_contains_error(monkeypatch, domain):
     """get_Data should raise with the API message when response payload starts with error."""
 
     class _Response:
@@ -37,10 +37,11 @@ def test_get_data_raises_when_payload_contains_error(monkeypatch):
             credentials={"identity": "user", "password": "pass"},
             start_date=dt.date(2025, 5, 15),
             end_date=dt.date(2025, 5, 16),
+            domain=domain
         )
 
 
-def test_rate_limited_helper_short_circuits_after_rate_limit_error():
+def test_rate_limited_helper_short_circuits_after_rate_limit_error(domain):
     """After a rate-limit error, helper should raise immediately without new API calls."""
     call_count = {"value": 0}
 
@@ -57,6 +58,7 @@ def test_rate_limited_helper_short_circuits_after_rate_limit_error():
             credentials={"identity": "user", "password": "pass"},
             start_date=dt.date(2025, 5, 15),
             end_date=dt.date(2025, 5, 16),
+            domain=domain,
             request_timestamps=request_timestamps,
             max_requests_per_minute=15,
             rate_limit_error_state=error_state,
@@ -71,6 +73,7 @@ def test_rate_limited_helper_short_circuits_after_rate_limit_error():
             credentials={"identity": "user", "password": "pass"},
             start_date=dt.date(2025, 5, 15),
             end_date=dt.date(2025, 5, 16),
+            domain=domain,
             request_timestamps=request_timestamps,
             max_requests_per_minute=15,
             rate_limit_error_state=error_state,
