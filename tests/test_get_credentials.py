@@ -56,3 +56,39 @@ def test_credentials_from_netrc(fs, monkeypatch):
     username, password = get_credentials(DOMAIN, args=None)
     assert username == "netrc_user"
     assert password == "netrc_pass"
+
+
+def test_credentials_from_netrc_fallback_to_parent_domain(fs, monkeypatch):
+    """A subdomain should fall back to a less specific parent domain entry."""
+    monkeypatch.delenv("SPACEUSER", raising=False)
+    monkeypatch.delenv("SPACEPSWD", raising=False)
+
+    home_dir = os.path.expanduser("~")
+    netrc_content = "machine space-track.org\nlogin parent_user\npassword parent_pass\n"
+    netrc_path = os.path.join(home_dir, ".netrc")
+    fs.create_file(netrc_path, contents=netrc_content)
+    os.chmod(netrc_path, stat.S_IRUSR | stat.S_IWUSR)
+
+    username, password = get_credentials("test.space-track.org", args=None)
+    assert username == "parent_user"
+    assert password == "parent_pass"
+
+
+def test_credentials_from_netrc_prefers_most_specific_match(fs, monkeypatch):
+    """When multiple domains match, the most specific one should be selected."""
+    monkeypatch.delenv("SPACEUSER", raising=False)
+    monkeypatch.delenv("SPACEPSWD", raising=False)
+
+    home_dir = os.path.expanduser("~")
+    netrc_content = (
+        "machine space-track.org\nlogin parent_user\npassword parent_pass\n"
+        "machine env.test.space-track.org\nlogin specific_user\npassword specific_pass\n"
+        "machine test.space-track.org\nlogin mid_user\npassword mid_pass\n"
+    )
+    netrc_path = os.path.join(home_dir, ".netrc")
+    fs.create_file(netrc_path, contents=netrc_content)
+    os.chmod(netrc_path, stat.S_IRUSR | stat.S_IWUSR)
+
+    username, password = get_credentials("env.test.space-track.org", args=None)
+    assert username == "specific_user"
+    assert password == "specific_pass"
