@@ -6,7 +6,7 @@ import stat
 
 import pytest
 
-from satellite_overpass_identification_tool.app import get_credentials
+from satellite_overpass_identification_tool.credentials import get_credentials
 
 DOMAIN = "space-track.org"
 
