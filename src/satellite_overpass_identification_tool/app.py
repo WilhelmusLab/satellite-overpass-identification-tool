@@ -217,7 +217,7 @@ def get_Data(credentials: dict, start_date, end_date):
     epoch_range = f"{start_date.isoformat()}--{end_date.isoformat()}"
     
     url = f"{uriBase}/basicspacedata/query/class/gp_history/NORAD_CAT_ID/{norad_ids}/orderby/TLE_LINE1%20ASC/EPOCH/{epoch_range}/format/json"
-    satellite_data = {}
+    satellite_data = {sat_name: [] for sat_name in SATELLITES.keys()}
 
     with requests.Session() as session:
         # Log in with username and password.
@@ -242,8 +242,8 @@ def get_Data(credentials: dict, start_date, end_date):
         
     for item in payload:
         norad_id = item.get("NORAD_CAT_ID")
-        sat_name = ID_SATELLITE_MAPPING.get(norad_id)
-        satellite_data.setdefault(sat_name, []).append(item)
+        sat_name = ID_SATELLITE_MAPPING[norad_id]
+        satellite_data[sat_name].append(item)
 
     return satellite_data
 
