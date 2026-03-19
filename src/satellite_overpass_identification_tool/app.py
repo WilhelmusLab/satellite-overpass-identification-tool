@@ -48,9 +48,11 @@ class PassEvent(IntEnum):
 
 # Satellite configurations: NORAD catalog IDs and orbit direction for pass filtering
 SATELLITES = {
-    "aqua": {"norad_id": 27424, "direction": Direction.ASCENDING},
-    "terra": {"norad_id": 25994, "direction": Direction.DESCENDING},
+    "aqua": {"norad_id": "27424", "direction": Direction.ASCENDING},
+    "terra": {"norad_id": "25994", "direction": Direction.DESCENDING},
 }
+ID_SATELLITE_MAPPING = {config["norad_id"]: name for name, config in SATELLITES.items()}
+
 netrc_message = f"""
 {domain} SPACEUSER and SPACEPSWD can be set:
 - on the command line,
@@ -210,7 +212,12 @@ def get_Data(credentials: dict, start_date, end_date):
     uriBase = "https://www.space-track.org"
     requestLogin = "/ajaxauth/login"
     
+    norad_ids = ",".join([str(sat_config["norad_id"]) for sat_config in SATELLITES.values()])
+    sat_names = ",".join(SATELLITES.keys())
     epoch_range = f"{start_date.isoformat()}--{end_date.isoformat()}"
+    
+    url = f"{uriBase}/basicspacedata/query/class/gp_history/NORAD_CAT_ID/{norad_ids}/orderby/TLE_LINE1%20ASC/EPOCH/{epoch_range}/format/json"
+    satellite_data = {}
 
     with requests.Session() as session:
         # Log in with username and password.
@@ -222,24 +229,21 @@ def get_Data(credentials: dict, start_date, end_date):
                 % resp.status_code,
                 response=resp,
             )
-
-        satellite_data = {}
-        for sat_name, sat_config in SATELLITES.items():
-            norad_id = sat_config["norad_id"]
-            resp = session.get(
-                f"{uriBase}/basicspacedata/query/class/gp_history/NORAD_CAT_ID/{norad_id}/orderby/TLE_LINE1%20ASC/EPOCH/{epoch_range}/format/json"
+        resp = session.get(url)
+        if resp.status_code != 200:
+            print(f"Warning: Failed to fetch TLE data for {sat_names} (NORAD {norad_ids}): {resp}")
+        
+        payload = json.loads(resp.text)
+        error_message = _extract_spacetrack_error(payload)
+        if error_message is not None:
+            raise RuntimeError(
+                f"Space-Track API error for {sat_names} (NORAD {norad_ids}): {error_message}"
             )
-            if resp.status_code != 200:
-                print(f"Warning: Failed to fetch TLE data for {sat_name} (NORAD {norad_id}): {resp}")
-                satellite_data[sat_name] = []
-            else:
-                payload = json.loads(resp.text)
-                error_message = _extract_spacetrack_error(payload)
-                if error_message is not None:
-                    raise RuntimeError(
-                        f"Space-Track API error for {sat_name} (NORAD {norad_id}): {error_message}"
-                    )
-                satellite_data[sat_name] = payload
+        
+    for item in payload:
+        norad_id = item.get("NORAD_CAT_ID")
+        sat_name = ID_SATELLITE_MAPPING.get(norad_id)
+        satellite_data.setdefault(sat_name, []).append(item)
 
     return satellite_data
 
