@@ -27,7 +27,8 @@ import argparse
 import pathlib
 from enum import Enum, IntEnum
 from typing import cast
-from satellite_overpass_identification_tool.credentials import get_credentials
+
+from .credentials import get_credentials, netrc_message
 
 
 class Direction(Enum):
@@ -47,28 +48,6 @@ SATELLITES = {
 }
 ID_SATELLITE_MAPPING = {config["norad_id"]: name for name, config in SATELLITES.items()}
 
-netrc_message = f"""
-[for-testing-only.]space-track.org SPACEUSER and SPACEPSWD can be set:
-- on the command line,
-- as environment variables,
-- or in a .netrc file.
-
-Add the following lines to a file named .netrc in your home directory, 
-replacing USERNAME and PASSWORD with your space-track.org credentials:
-
-machine space-track.org
-        login USERNAME
-        password PASSWORD
-
-machine for-testing-only.space-track.org
-        login USERNAME
-        password PASSWORD
-
-
-Ensure the file has the correct permissions, 
-e.g., `chmod 600 ~/.netrc` on Unix systems
-to keep your credentials secure.
-"""
 
 PASS_TIMES_DTYPE = np.dtype([
     ("date", "U10"),

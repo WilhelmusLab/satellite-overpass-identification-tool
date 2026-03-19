@@ -5,6 +5,25 @@ import os
 from urllib.parse import urlparse
 
 
+netrc_message = f"""
+space-track.org SPACEUSER and SPACEPSWD can be set:
+- on the command line,
+- as environment variables,
+- or in a .netrc file.
+
+Add the following lines to a file named .netrc in your home directory, 
+replacing USERNAME and PASSWORD with your space-track.org credentials:
+
+machine space-track.org
+        login USERNAME
+        password PASSWORD
+
+Ensure the file has the correct permissions, 
+e.g., `chmod 600 ~/.netrc` on Unix systems
+to keep your credentials secure.
+"""
+
+
 def _normalize_domain_for_netrc(domain):
     """Normalize a domain-like input to a hostname suitable for .netrc lookup."""
     value = (domain or "").strip().lower()
