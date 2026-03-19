@@ -3,6 +3,7 @@
 from collections import deque
 
 import pytest
+import datetime as dt
 
 import conftest as test_conftest
 import satellite_overpass_identification_tool.app as app_module
@@ -34,8 +35,8 @@ def test_get_data_raises_when_payload_contains_error(monkeypatch):
     with pytest.raises(RuntimeError, match="rate limit"):
         app_module.get_Data(
             credentials={"identity": "user", "password": "pass"},
-            start_date=["05", "15", "2025"],
-            end_date=["05", "16", "2025"],
+            start_date=dt.date(2025, 5, 15),
+            end_date=dt.date(2025, 5, 16),
         )
 
 
@@ -54,8 +55,8 @@ def test_rate_limited_helper_short_circuits_after_rate_limit_error():
         test_conftest._get_data_rate_limited(
             get_data_func=_always_rate_limited,
             credentials={"identity": "user", "password": "pass"},
-            start_date=["05", "15", "2025"],
-            end_date=["05", "16", "2025"],
+            start_date=dt.date(2025, 5, 15),
+            end_date=dt.date(2025, 5, 16),
             request_timestamps=request_timestamps,
             max_requests_per_minute=15,
             rate_limit_error_state=error_state,
@@ -68,8 +69,8 @@ def test_rate_limited_helper_short_circuits_after_rate_limit_error():
         test_conftest._get_data_rate_limited(
             get_data_func=_always_rate_limited,
             credentials={"identity": "user", "password": "pass"},
-            start_date=["05", "15", "2025"],
-            end_date=["05", "16", "2025"],
+            start_date=dt.date(2025, 5, 15),
+            end_date=dt.date(2025, 5, 16),
             request_timestamps=request_timestamps,
             max_requests_per_minute=15,
             rate_limit_error_state=error_state,
