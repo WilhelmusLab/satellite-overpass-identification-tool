@@ -18,6 +18,9 @@ machine space-track.org
         login USERNAME
         password PASSWORD
 
+For access to for-testing-only.space-track.org, 
+request access from admin@space-track.org. 
+        
 Ensure the file has the correct permissions, 
 e.g., `chmod 600 ~/.netrc` on Unix systems
 to keep your credentials secure.
