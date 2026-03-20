@@ -25,7 +25,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
-addopts = ["--doctest-modules"]
+addopts = ["--doctest-modules", "--verbose", "-s"]
 markers = [
     "integration: marks tests as integration tests (require network and credentials)",
 ]
