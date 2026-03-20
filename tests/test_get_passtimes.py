@@ -522,7 +522,7 @@ def test_get_passtimes_validated_longitude_grid_parametrized(
     password = validated_grid_data["password"]
     satellite_data = validated_grid_data["satellite_data"]
 
-    monkeypatch.setattr(app_module, "get_Data", lambda credentials, start_date, end_date: satellite_data)
+    monkeypatch.setattr(app_module, "get_Data", lambda credentials, start_date, end_date, domain: satellite_data)
 
     passtimes = get_passtimes(
         start_date=dt.date.fromisoformat(date),
