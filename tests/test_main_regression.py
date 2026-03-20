@@ -23,7 +23,7 @@ EXPECTED_ROWS_80N_105W_2025_05_15 = [
 
 
 @pytest.mark.integration
-def test_main_regression_2025_05_15_80n_105w(credentials, monkeypatch, tmp_path):
+def test_main_regression_2025_05_15_80n_105w(credentials, monkeypatch, tmp_path, domain):
     """main() should emit the known CSV rows for 2025-05-15 at 80N, -105E."""
     username, password = credentials
     output_path = tmp_path / "overpass_regression.csv"
@@ -46,6 +46,8 @@ def test_main_regression_2025_05_15_80n_105w(credentials, monkeypatch, tmp_path)
             "-105",
             "--csvoutpath",
             str(output_path),
+            "--domain",
+            domain,
         ],
     )
 
@@ -58,7 +60,7 @@ def test_main_regression_2025_05_15_80n_105w(credentials, monkeypatch, tmp_path)
 
 
 @pytest.mark.integration
-def test_main_regression_directory_output_2025_05_15_80n_105w(credentials, monkeypatch, tmp_path):
+def test_main_regression_directory_output_2025_05_15_80n_105w(credentials, monkeypatch, tmp_path, domain):
     """main() should create the expected csv filename and contents when csvoutpath is a directory."""
     username, password = credentials
     output_dir = tmp_path / "out"
@@ -83,6 +85,8 @@ def test_main_regression_directory_output_2025_05_15_80n_105w(credentials, monke
             "-105",
             "--csvoutpath",
             str(output_dir),
+            "--domain",
+            domain,
         ],
     )
 
