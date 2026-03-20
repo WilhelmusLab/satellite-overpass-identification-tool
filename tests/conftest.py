@@ -46,6 +46,7 @@ def _get_data_rate_limited(
         time.sleep(max(0.01, sleep_seconds))
 
     try:
+        print("Calling get_data_func at time:", time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
         satellite_data = get_data_func(
             credentials=credentials,
             start_date=start_date,
