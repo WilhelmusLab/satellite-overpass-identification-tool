@@ -207,6 +207,7 @@ def get_Data(credentials: dict, start_date, end_date, domain):
                 % resp.status_code,
                 response=resp,
             )
+        print(f"Fetching TLE data for {sat_names} (NORAD {norad_ids}) for epoch range {epoch_range} from {domain}...")
         resp = session.get(data_url)
         if resp.status_code != 200:
             print(f"Warning: Failed to fetch TLE data for {sat_names} (NORAD {norad_ids}): {resp}")
