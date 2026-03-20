@@ -130,6 +130,7 @@ def validated_grid_data(rate_limited_get_data, credentials, domain):
         "username": username,
         "password": password,
         "satellite_data": satellite_data,
+        "domain": domain
     }
 
 
