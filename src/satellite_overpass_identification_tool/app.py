@@ -202,9 +202,8 @@ def get_Data(credentials: dict, start_date, end_date, domain):
         resp = session.post(login_url, data=credentials)
         if resp.status_code != 200:
             raise requests.HTTPError(
-                "POST fail on login (status %s). Your username/password may be incorrect. "
-                "Check the ~/.netrc file or environment variables and try again."
-                % resp.status_code,
+                "Login failed for %s with status code: %s %s\n%s"
+                % (resp.url, resp.status_code, resp.reason, resp.text),
                 response=resp,
             )
         print(f"Fetching TLE data for {sat_names} (NORAD {norad_ids}) for epoch range {epoch_range} from {domain}...")
