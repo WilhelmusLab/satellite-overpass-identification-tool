@@ -25,7 +25,7 @@ from satellite_overpass_identification_tool.app import get_passtimes
         pytest.param("kara_sea", "2023-12-01", "2023-12-31", 77, 77, 62, id="kara_sea: 2023-12"),
     ],
 )
-def test_get_passtimes(credentials, region, start_date, end_date, lat, lon, expected_rows, domain):
+def test_get_passtimes(credentials, region, start_date, end_date, lat, lon, expected_rows, domain, use_rate_limited_get_data):
     """Load overpass times for given date range and coordinates."""
     username, password = credentials
 
@@ -68,7 +68,7 @@ def test_get_passtimes(credentials, region, start_date, end_date, lat, lon, expe
         pytest.param("kara_sea", "2023-12-01", 77, 77, "2023-12-01T06:48:37Z", "2023-12-01T07:05:39Z", id="kara_sea: 2023-12-01", marks=pytest.mark.xfail(reason="2023-12-01 TLE data may not be available from for-testing-only.space-track.org")),
     ],
 )
-def test_get_passtimes_specific(credentials, region, date, lat, lon, expected_aqua, expected_terra, domain):
+def test_get_passtimes_specific(credentials, region, date, lat, lon, expected_aqua, expected_terra, domain, use_rate_limited_get_data):
     """Verify specific overpass times for a given date and coordinates."""
     username, password = credentials
 
@@ -515,6 +515,7 @@ def test_get_passtimes_validated_longitude_grid_parametrized(
     satellite,
     expected_time,
     domain,
+    use_rate_limited_get_data,
     tolerance_seconds=120,
 ):
     """Validate each satellite overpass is within ~2 minutes of expected_time."""
