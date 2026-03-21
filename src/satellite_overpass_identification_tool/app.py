@@ -30,10 +30,9 @@ import os
 import pathlib
 import netrc
 
-# URLs for space track login.
-domain = "space-track.org"
-uriBase = f"https://{domain}"
-requestLogin = "/ajaxauth/login"
+# Domain constants for Space-Track.
+SPACETRACK_BASE_DOMAIN = "space-track.org"
+SPACETRACK_DEFAULT_DOMAIN = f"www.{SPACETRACK_BASE_DOMAIN}"
 
 # Satellite configurations: NORAD catalog IDs and orbit direction for pass filtering
 SATELLITES = {
@@ -41,15 +40,15 @@ SATELLITES = {
     "terra": {"norad_id": 25994, "ascending": False},
 }
 netrc_message = f"""
-{domain} SPACEUSER and SPACEPSWD can be set:
+{SPACETRACK_BASE_DOMAIN} SPACEUSER and SPACEPSWD can be set:
 - on the command line,
 - as environment variables,
 - or in a .netrc file.
 
 Add the following lines to a file named .netrc in your home directory, 
-replacing USERNAME and PASSWORD with your {domain} credentials:
+replacing USERNAME and PASSWORD with your {SPACETRACK_BASE_DOMAIN} credentials:
 
-machine {domain}
+machine {SPACETRACK_BASE_DOMAIN}
         login USERNAME
         password PASSWORD
 
@@ -71,7 +70,7 @@ def _parsedate(date):
     return datetime.datetime.strptime(date, "%Y-%m-%d").strftime("%m-%d-%Y").split("-")
 
 
-def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPSWD, domain="www.space-track.org"):
+def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPSWD, domain=SPACETRACK_DEFAULT_DOMAIN):
     siteCred = {"identity": SPACEUSER, "password": SPACEPSWD}
     print(f"Outpath {csvoutpath}")
     print(f"Timeframe starts on {start_date}, and ends on {end_date}")
@@ -276,7 +275,7 @@ def to_utc(t):
     return ts.utc(int(t[2]), int(t[0]), int(t[1]))
 
 
-def get_Data(credentials: dict, start_date, end_date, domain="www.space-track.org"):
+def get_Data(credentials: dict, start_date, end_date, domain=SPACETRACK_DEFAULT_DOMAIN):
     """Fetch TLE data for all configured satellites.
     
     Returns:
@@ -452,8 +451,8 @@ def get_credentials(domain, args=None):
             # If no exact match found, fall back to the parent domain for
             # subdomains of space-track.org (e.g. www.space-track.org or
             # for-testing-only.space-track.org).
-            if netrc_creds is None and domain.endswith(".space-track.org"):
-                netrc_creds = netrc_file.authenticators("space-track.org")
+            if netrc_creds is None and domain.endswith(f".{SPACETRACK_BASE_DOMAIN}"):
+                netrc_creds = netrc_file.authenticators(SPACETRACK_BASE_DOMAIN)
             if netrc_creds is not None:
                 login, _, netrc_password = netrc_creds
                 if username is None:
@@ -520,7 +519,7 @@ def main():
     parser.add_argument(
         "--domain",
         type=str,
-        default="www.space-track.org",
+        default=SPACETRACK_DEFAULT_DOMAIN,
         help="Base domain for Space-Track API (default: %(default)s)",
     )
 
