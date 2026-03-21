@@ -71,7 +71,7 @@ def _parsedate(date):
     return datetime.datetime.strptime(date, "%Y-%m-%d").strftime("%m-%d-%Y").split("-")
 
 
-def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPSWD):
+def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPSWD, domain="www.space-track.org"):
     siteCred = {"identity": SPACEUSER, "password": SPACEPSWD}
     print(f"Outpath {csvoutpath}")
     print(f"Timeframe starts on {start_date}, and ends on {end_date}")
@@ -79,7 +79,7 @@ def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPS
 
     end_date_next = getNextDay(end_date)
 
-    satellite_data = get_Data(siteCred, start_date, end_date_next)
+    satellite_data = get_Data(siteCred, start_date, end_date_next, domain)
 
     # Load in orbital mechanics tool timescale.
     ts = load.timescale()
@@ -276,13 +276,13 @@ def to_utc(t):
     return ts.utc(int(t[2]), int(t[0]), int(t[1]))
 
 
-def get_Data(credentials: dict, start_date, end_date):
+def get_Data(credentials: dict, start_date, end_date, domain="www.space-track.org"):
     """Fetch TLE data for all configured satellites.
     
     Returns:
         dict: Mapping of satellite name to TLE data list. Empty list if no data available.
     """
-    uriBase = "https://www.space-track.org"
+    uriBase = f"https://{domain}"
     requestLogin = "/ajaxauth/login"
     
     epoch_range = f"{start_date[2]}-{start_date[0]}-{start_date[1]}--{end_date[2]}-{end_date[0]}-{end_date[1]}"
@@ -511,15 +511,21 @@ def main():
         type=str,
         help="Path to output CSV file, or a directory, where the output should be written",
     )
+    parser.add_argument(
+        "--domain",
+        type=str,
+        default="www.space-track.org",
+        help="Base domain for Space-Track API (default: %(default)s)",
+    )
 
     args = parser.parse_args()
 
-    args.SPACEUSER, args.SPACEPSWD = get_credentials(domain, args=args)
+    args.SPACEUSER, args.SPACEPSWD = get_credentials(args.domain, args=args)
 
     if args.SPACEUSER is None or args.SPACEPSWD is None:
         print(netrc_message)
         raise SystemExit(
-            f"Error: No credentials found for {domain}. "
+            f"Error: No credentials found for {args.domain}. "
             "Provide --SPACEUSER and --SPACEPSWD, set SPACEUSER and SPACEPSWD "
             "environment variables, or add credentials to your ~/.netrc file."
         )

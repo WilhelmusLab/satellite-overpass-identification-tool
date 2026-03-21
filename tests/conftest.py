@@ -8,7 +8,16 @@ import pytest
 import satellite_overpass_identification_tool.app as app_module
 
 
-def _get_data_rate_limited(get_data_func, credentials, start_date, end_date, request_timestamps, max_requests_per_minute=15):
+TEST_DOMAIN = "for-testing-only.space-track.org"
+
+
+@pytest.fixture(scope="session")
+def domain():
+    """Provide the Space-Track domain to use in tests."""
+    return TEST_DOMAIN
+
+
+def _get_data_rate_limited(get_data_func, credentials, start_date, end_date, domain, request_timestamps, max_requests_per_minute=15):
     """Call get_Data while limiting estimated API requests to max_requests_per_minute.
 
     app_module.get_Data performs one login request and one request per satellite,
@@ -32,6 +41,7 @@ def _get_data_rate_limited(get_data_func, credentials, start_date, end_date, req
         credentials=credentials,
         start_date=start_date,
         end_date=end_date,
+        domain=domain,
     )
 
     request_timestamps.extend([time.monotonic()] * requests_per_get_data_call)
@@ -44,12 +54,13 @@ def rate_limited_get_data():
     request_timestamps = deque()
     original_get_data = app_module.get_Data
 
-    def _wrapper(credentials, start_date, end_date):
+    def _wrapper(credentials, start_date, end_date, domain=TEST_DOMAIN):
         return _get_data_rate_limited(
             get_data_func=original_get_data,
             credentials=credentials,
             start_date=start_date,
             end_date=end_date,
+            domain=domain,
             request_timestamps=request_timestamps,
             max_requests_per_minute=15,
         )
