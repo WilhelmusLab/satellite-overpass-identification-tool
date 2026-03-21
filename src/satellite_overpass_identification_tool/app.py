@@ -447,7 +447,13 @@ def get_credentials(domain, args=None):
     # 3. Check .netrc file
     if username is None or password is None:
         try:
-            netrc_creds = netrc.netrc().authenticators(domain)
+            netrc_file = netrc.netrc()
+            netrc_creds = netrc_file.authenticators(domain)
+            # If no exact match found, fall back to the parent domain for
+            # subdomains of space-track.org (e.g. www.space-track.org or
+            # for-testing-only.space-track.org).
+            if netrc_creds is None and domain.endswith(".space-track.org"):
+                netrc_creds = netrc_file.authenticators("space-track.org")
             if netrc_creds is not None:
                 login, _, netrc_password = netrc_creds
                 if username is None:

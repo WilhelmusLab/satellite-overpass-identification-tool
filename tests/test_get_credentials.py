@@ -56,3 +56,47 @@ def test_credentials_from_netrc(fs, monkeypatch):
     username, password = get_credentials(DOMAIN, args=None)
     assert username == "netrc_user"
     assert password == "netrc_pass"
+
+
+@pytest.mark.parametrize(
+    "subdomain",
+    ["www.space-track.org", "for-testing-only.space-track.org"],
+)
+def test_credentials_from_netrc_parent_domain_fallback(fs, monkeypatch, subdomain):
+    """When the .netrc has space-track.org but not the subdomain, the parent entry is used."""
+    monkeypatch.delenv("SPACEUSER", raising=False)
+    monkeypatch.delenv("SPACEPSWD", raising=False)
+
+    home_dir = os.path.expanduser("~")
+    # Only the parent domain is listed in .netrc
+    netrc_content = "machine space-track.org\nlogin parent_user\npassword parent_pass\n"
+    netrc_path = os.path.join(home_dir, ".netrc")
+    fs.create_file(netrc_path, contents=netrc_content)
+    os.chmod(netrc_path, stat.S_IRUSR | stat.S_IWUSR)
+
+    username, password = get_credentials(subdomain, args=None)
+    assert username == "parent_user"
+    assert password == "parent_pass"
+
+
+@pytest.mark.parametrize(
+    "subdomain",
+    ["www.space-track.org", "for-testing-only.space-track.org"],
+)
+def test_credentials_from_netrc_specific_domain_takes_priority(fs, monkeypatch, subdomain):
+    """When .netrc has both the specific subdomain and space-track.org, the subdomain entry wins."""
+    monkeypatch.delenv("SPACEUSER", raising=False)
+    monkeypatch.delenv("SPACEPSWD", raising=False)
+
+    home_dir = os.path.expanduser("~")
+    netrc_content = (
+        f"machine {subdomain}\nlogin specific_user\npassword specific_pass\n"
+        "machine space-track.org\nlogin parent_user\npassword parent_pass\n"
+    )
+    netrc_path = os.path.join(home_dir, ".netrc")
+    fs.create_file(netrc_path, contents=netrc_content)
+    os.chmod(netrc_path, stat.S_IRUSR | stat.S_IWUSR)
+
+    username, password = get_credentials(subdomain, args=None)
+    assert username == "specific_user"
+    assert password == "specific_pass"
