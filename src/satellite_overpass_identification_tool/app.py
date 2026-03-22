@@ -34,11 +34,10 @@ from .credentials import get_credentials, netrc_message
 
 # Satellite configurations: NORAD catalog IDs and orbit direction for pass filtering
 SATELLITES = {
-    "aqua": {"norad_id": '27424', "ascending": True},
-    "terra": {"norad_id": '25994', "ascending": False},
+    "aqua": {"norad_id": "27424", "ascending": True},
+    "terra": {"norad_id": "25994", "ascending": False},
 }
 ID_SATELLITE_MAPPING = {config["norad_id"]: name for name, config in SATELLITES.items()}
-
 
 
 def _parsedate(date):
@@ -266,16 +265,18 @@ def _extract_spacetrack_error(payload):
 
 def get_data(credentials: dict, start_date, end_date, domain):
     """Fetch TLE data for all configured satellites.
-    
+
     Returns:
         dict: Mapping of satellite name to TLE data list. Empty list if no data available.
     """
     epoch_range = f"{start_date[2]}-{start_date[0]}-{start_date[1]}--{end_date[2]}-{end_date[0]}-{end_date[1]}"
-    norad_ids = ",".join([str(sat_config["norad_id"]) for sat_config in SATELLITES.values()])
+    norad_ids = ",".join(
+        [str(sat_config["norad_id"]) for sat_config in SATELLITES.values()]
+    )
     sat_names = ",".join(SATELLITES.keys())
     login_url = f"https://{domain}/ajaxauth/login"
-    data_url = f"https://{domain}/basicspacedata/query/class/gp_history/NORAD_CAT_ID/{norad_ids}/orderby/TLE_LINE1%20ASC/EPOCH/{epoch_range}/format/json" 
-    
+    data_url = f"https://{domain}/basicspacedata/query/class/gp_history/NORAD_CAT_ID/{norad_ids}/orderby/TLE_LINE1%20ASC/EPOCH/{epoch_range}/format/json"
+
     satellite_data = {sat_name: [] for sat_name in SATELLITES.keys()}
 
     with requests.Session() as session:
@@ -287,7 +288,9 @@ def get_data(credentials: dict, start_date, end_date, domain):
                 % (resp.url, resp.status_code, resp.reason, resp.text),
                 response=resp,
             )
-        print(f"Fetching TLE data for {sat_names} (NORAD {norad_ids}) for epoch range {epoch_range} from {domain}...")
+        print(
+            f"Fetching TLE data for {sat_names} (NORAD {norad_ids}) for epoch range {epoch_range} from {domain}..."
+        )
         resp = session.get(data_url)
         if resp.status_code != 200:
             raise requests.HTTPError(
@@ -301,7 +304,7 @@ def get_data(credentials: dict, start_date, end_date, domain):
             raise RuntimeError(
                 f"Space-Track API error for {sat_names} (NORAD {norad_ids}): {error_message}"
             )
-        
+
     for item in payload:
         norad_id = item.get("NORAD_CAT_ID")
         sat_name = ID_SATELLITE_MAPPING[norad_id]
@@ -459,9 +462,8 @@ def main():
         type=str,
         default="www.space-track.org",
         help="Base domain for Space-Track API (default: %(default)s). "
-             "This is intended for testing with a mock server and should not be changed for normal use."
+        "This is intended for testing with a mock server and should not be changed for normal use.",
     )
-
 
     args = parser.parse_args()
 
