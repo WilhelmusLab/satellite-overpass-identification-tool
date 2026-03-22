@@ -23,7 +23,7 @@ from satellite_overpass_identification_tool.app import get_passtimes, _parsedate
         pytest.param("barents_sea", "2012-01-01", "2012-01-15", 75, 40, 30, id="barents_sea: 2012-01"),
         pytest.param("barents_sea", "2022-06-01", "2022-06-30", 75, 40, 60, id="barents_sea: 2022-06"),
         pytest.param("kara_sea", "2015-09-01", "2015-09-14", 77, 77, 28, id="kara_sea: 2015-09"),
-        pytest.param("kara_sea", "2023-12-01", "2023-12-31", 77, 77, 62, id="kara_sea: 2023-12"),
+        pytest.param("kara_sea", "2023-12-01", "2023-12-31", 77, 77, 62, id="kara_sea: 2023-12", marks=pytest.mark.xfail(reason="test may fail if overpass times are not available on test server")),
     ],
 )
 def test_get_passtimes(credentials, domain, region, start_date, end_date, lat, lon, expected_rows, use_rate_limited_get_data):
