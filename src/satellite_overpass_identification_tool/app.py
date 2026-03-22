@@ -290,8 +290,11 @@ def get_Data(credentials: dict, start_date, end_date, domain):
         print(f"Fetching TLE data for {sat_names} (NORAD {norad_ids}) for epoch range {epoch_range} from {domain}...")
         resp = session.get(data_url)
         if resp.status_code != 200:
-            print(f"Warning: Failed to fetch TLE data for {sat_names} (NORAD {norad_ids}): {resp}")
-        
+            raise requests.HTTPError(
+                "Data fetch failed for %s with status code: %s %s\n%s"
+                % (resp.url, resp.status_code, resp.reason, resp.text),
+                response=resp,
+            )
         payload = json.loads(resp.text)
         error_message = _extract_spacetrack_error(payload)
         if error_message is not None:
