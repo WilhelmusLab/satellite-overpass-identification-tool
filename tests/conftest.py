@@ -81,7 +81,7 @@ def rate_limited_get_data():
 
 @pytest.fixture()
 def use_rate_limited_get_data(monkeypatch, rate_limited_get_data):
-    """Route app.get_Data through the shared rate-limited wrapper for all tests."""
+    """Route app.get_Data through the shared rate-limited wrapper for tests that request this fixture."""
     monkeypatch.setattr(app_module, "get_Data", rate_limited_get_data)
 
 
