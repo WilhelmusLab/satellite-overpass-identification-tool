@@ -1,4 +1,4 @@
-"""Unit tests for API error handling around get_Data and rate-limited wrappers."""
+"""Unit tests for API error handling around get_data and rate-limited wrappers."""
 
 from collections import deque
 
@@ -10,7 +10,7 @@ import satellite_overpass_identification_tool.app as app_module
 
 
 def test_get_data_raises_when_payload_contains_error(monkeypatch, domain):
-    """get_Data should raise with the API message when response payload starts with error."""
+    """get_data should raise with the API message when response payload starts with error."""
 
     class _Response:
         def __init__(self, status_code, text):
@@ -33,7 +33,7 @@ def test_get_data_raises_when_payload_contains_error(monkeypatch, domain):
     monkeypatch.setattr(app_module.requests, "Session", lambda: _Session())
 
     with pytest.raises(RuntimeError, match="rate limit"):
-        app_module.get_Data(
+        app_module.get_data(
             credentials={"identity": "user", "password": "pass"},
             start_date=["05", "15", "2025"],
             end_date=["05", "16", "2025"],

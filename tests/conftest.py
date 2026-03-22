@@ -18,9 +18,9 @@ def _get_data_rate_limited(
     max_requests_per_minute=15,
     rate_limit_error_state=None,
 ):
-    """Call get_Data while limiting estimated API requests to max_requests_per_minute.
+    """Call get_data while limiting estimated API requests to max_requests_per_minute.
 
-    app_module.get_Data performs one login request and one request per satellite,
+    app_module.get_data performs one login request and one request per satellite,
     so we reserve 3 request slots for each call.
     """
     if rate_limit_error_state is not None and rate_limit_error_state["message"] is not None:
@@ -59,10 +59,10 @@ def _get_data_rate_limited(
 
 @pytest.fixture(scope="session")
 def rate_limited_get_data():
-    """Provide a shared rate-limited get_Data wrapper for integration tests."""
+    """Provide a shared rate-limited get_data wrapper for integration tests."""
     request_timestamps = deque()
     rate_limit_error_state = {"message": None}
-    original_get_data = app_module.get_Data
+    original_get_data = app_module.get_data
 
     def _wrapper(credentials, start_date, end_date, domain):
         return _get_data_rate_limited(
@@ -81,13 +81,13 @@ def rate_limited_get_data():
 
 @pytest.fixture()
 def use_rate_limited_get_data(monkeypatch, rate_limited_get_data):
-    """Route app.get_Data through the shared rate-limited wrapper for all tests."""
-    monkeypatch.setattr(app_module, "get_Data", rate_limited_get_data)
+    """Route app.get_data through the shared rate-limited wrapper for all tests."""
+    monkeypatch.setattr(app_module, "get_data", rate_limited_get_data)
 
 
 @pytest.fixture(scope="session")
 def domain():
-    """Domain to use for testing get_credentials and get_Data."""
+    """Domain to use for testing get_credentials and get_data."""
     return "for-testing-only.space-track.org"
 
 

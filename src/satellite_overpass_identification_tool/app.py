@@ -53,7 +53,7 @@ def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPS
 
     end_date_next = getNextDay(end_date)
 
-    satellite_data = get_Data(siteCred, start_date, end_date_next, domain)
+    satellite_data = get_data(siteCred, start_date, end_date_next, domain)
 
     # Load in orbital mechanics tool timescale.
     ts = load.timescale()
@@ -264,7 +264,7 @@ def _extract_spacetrack_error(payload):
     return None
 
 
-def get_Data(credentials: dict, start_date, end_date, domain):
+def get_data(credentials: dict, start_date, end_date, domain):
     """Fetch TLE data for all configured satellites.
     
     Returns:
