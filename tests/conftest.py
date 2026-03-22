@@ -20,13 +20,13 @@ def _get_data_rate_limited(
 ):
     """Call get_Data while limiting estimated API requests to max_requests_per_minute.
 
-    app_module.get_Data performs one login request and one request per satellite,
-    so we reserve 3 request slots for each call.
+    app_module.get_Data performs one login request and one combined request for both
+    satellites, so we reserve 2 request slots for each call.
     """
     if rate_limit_error_state is not None and rate_limit_error_state["message"] is not None:
         raise RuntimeError(rate_limit_error_state["message"])
 
-    requests_per_get_data_call = 3
+    requests_per_get_data_call = 2
     window_seconds = 60
 
     while True:
