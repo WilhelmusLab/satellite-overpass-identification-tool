@@ -16,12 +16,16 @@ def _get_data_rate_limited(
     domain,
     request_timestamps,
     max_requests_per_minute=15,
+    rate_limit_error_state=None,
 ):
     """Call get_Data while limiting estimated API requests to max_requests_per_minute.
 
     app_module.get_Data performs one login request and one request per satellite,
     so we reserve 3 request slots for each call.
     """
+    if rate_limit_error_state is not None and rate_limit_error_state["message"] is not None:
+        raise RuntimeError(rate_limit_error_state["message"])
+
     requests_per_get_data_call = 3
     window_seconds = 60
 
@@ -36,12 +40,18 @@ def _get_data_rate_limited(
         sleep_seconds = window_seconds - (now - request_timestamps[0])
         time.sleep(max(0.01, sleep_seconds))
 
-    satellite_data = get_data_func(
-        credentials=credentials,
-        start_date=start_date,
-        end_date=end_date,
-        domain=domain,
-    )
+    try:
+        satellite_data = get_data_func(
+            credentials=credentials,
+            start_date=start_date,
+            end_date=end_date,
+            domain=domain,
+        )
+    except Exception as exc:
+        message = str(exc)
+        if rate_limit_error_state is not None and "rate limit" in message.lower():
+            rate_limit_error_state["message"] = message
+        raise
 
     request_timestamps.extend([time.monotonic()] * requests_per_get_data_call)
     return satellite_data
@@ -51,6 +61,7 @@ def _get_data_rate_limited(
 def rate_limited_get_data():
     """Provide a shared rate-limited get_Data wrapper for integration tests."""
     request_timestamps = deque()
+    rate_limit_error_state = {"message": None}
     original_get_data = app_module.get_Data
 
     def _wrapper(credentials, start_date, end_date, domain):
@@ -62,6 +73,7 @@ def rate_limited_get_data():
             domain=domain,
             request_timestamps=request_timestamps,
             max_requests_per_minute=15,
+            rate_limit_error_state=rate_limit_error_state,
         )
 
     return _wrapper
