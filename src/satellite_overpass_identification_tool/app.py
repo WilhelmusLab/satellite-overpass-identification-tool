@@ -34,18 +34,11 @@ from .credentials import get_credentials, netrc_message
 
 # Satellite configurations: NORAD catalog IDs and orbit direction for pass filtering
 SATELLITES = {
-    "aqua": {"norad_id": 27424, "ascending": True},
-    "terra": {"norad_id": 25994, "ascending": False},
+    "aqua": {"norad_id": '27424', "ascending": True},
+    "terra": {"norad_id": '25994', "ascending": False},
 }
+ID_SATELLITE_MAPPING = {config["norad_id"]: name for name, config in SATELLITES.items()}
 
-
-# Define error.
-class MyError(Exception):
-    def __init___(self, args):
-        Exception.__init__(
-            self, "my exception was raised with arguments {0}".format(args)
-        )
-        self.args = args
 
 
 def _parsedate(date):
@@ -257,36 +250,59 @@ def to_utc(t):
     return ts.utc(int(t[2]), int(t[0]), int(t[1]))
 
 
+
+def _extract_spacetrack_error(payload):
+    """Return Space-Track error text when payload contains an error entry."""
+    if isinstance(payload, dict) and "error" in payload:
+        return str(payload["error"])
+
+    if isinstance(payload, list) and payload:
+        first_item = payload[0]
+        if isinstance(first_item, dict) and "error" in first_item:
+            return str(first_item["error"])
+
+    return None
+
+
 def get_Data(credentials: dict, start_date, end_date, domain):
     """Fetch TLE data for all configured satellites.
     
     Returns:
         dict: Mapping of satellite name to TLE data list. Empty list if no data available.
     """
-    uriBase = f"https://{domain}"
-    requestLogin = "/ajaxauth/login"
-    
     epoch_range = f"{start_date[2]}-{start_date[0]}-{start_date[1]}--{end_date[2]}-{end_date[0]}-{end_date[1]}"
+    norad_ids = ",".join([str(sat_config["norad_id"]) for sat_config in SATELLITES.values()])
+    sat_names = ",".join(SATELLITES.keys())
+    login_url = f"https://{domain}/ajaxauth/login"
+    data_url = f"https://{domain}/basicspacedata/query/class/gp_history/NORAD_CAT_ID/{norad_ids}/orderby/TLE_LINE1%20ASC/EPOCH/{epoch_range}/format/json" 
+    
+    satellite_data = {sat_name: [] for sat_name in SATELLITES.keys()}
 
     with requests.Session() as session:
         # Log in with username and password.
-        resp = session.post(uriBase + requestLogin, data=credentials)
+        resp = session.post(login_url, data=credentials)
         if resp.status_code != 200:
-            raise MyError(
-                resp, "POST fail on login. Your username/password may be incorrect. Check the ~/.netrc file or environment variables and try again."
+            raise requests.HTTPError(
+                "Login failed for %s with status code: %s %s\n%s"
+                % (resp.url, resp.status_code, resp.reason, resp.text),
+                response=resp,
             )
-
-        satellite_data = {}
-        for sat_name, sat_config in SATELLITES.items():
-            norad_id = sat_config["norad_id"]
-            resp = session.get(
-                f"{uriBase}/basicspacedata/query/class/gp_history/NORAD_CAT_ID/{norad_id}/orderby/TLE_LINE1%20ASC/EPOCH/{epoch_range}/format/json"
+        print(f"Fetching TLE data for {sat_names} (NORAD {norad_ids}) for epoch range {epoch_range} from {domain}...")
+        resp = session.get(data_url)
+        if resp.status_code != 200:
+            print(f"Warning: Failed to fetch TLE data for {sat_names} (NORAD {norad_ids}): {resp}")
+        
+        payload = json.loads(resp.text)
+        error_message = _extract_spacetrack_error(payload)
+        if error_message is not None:
+            raise RuntimeError(
+                f"Space-Track API error for {sat_names} (NORAD {norad_ids}): {error_message}"
             )
-            if resp.status_code != 200:
-                print(f"Warning: Failed to fetch TLE data for {sat_name} (NORAD {norad_id}): {resp}")
-                satellite_data[sat_name] = []
-            else:
-                satellite_data[sat_name] = json.loads(resp.text)
+        
+    for item in payload:
+        norad_id = item.get("NORAD_CAT_ID")
+        sat_name = ID_SATELLITE_MAPPING[norad_id]
+        satellite_data[sat_name].append(item)
 
     return satellite_data
 
