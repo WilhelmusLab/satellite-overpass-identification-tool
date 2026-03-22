@@ -8,7 +8,15 @@ import pytest
 import satellite_overpass_identification_tool.app as app_module
 
 
-def _get_data_rate_limited(get_data_func, credentials, start_date, end_date, request_timestamps, max_requests_per_minute=15):
+def _get_data_rate_limited(
+    get_data_func,
+    credentials,
+    start_date,
+    end_date,
+    domain,
+    request_timestamps,
+    max_requests_per_minute=15,
+):
     """Call get_Data while limiting estimated API requests to max_requests_per_minute.
 
     app_module.get_Data performs one login request and one request per satellite,
@@ -32,6 +40,7 @@ def _get_data_rate_limited(get_data_func, credentials, start_date, end_date, req
         credentials=credentials,
         start_date=start_date,
         end_date=end_date,
+        domain=domain,
     )
 
     request_timestamps.extend([time.monotonic()] * requests_per_get_data_call)
@@ -44,12 +53,13 @@ def rate_limited_get_data():
     request_timestamps = deque()
     original_get_data = app_module.get_Data
 
-    def _wrapper(credentials, start_date, end_date):
+    def _wrapper(credentials, start_date, end_date, domain):
         return _get_data_rate_limited(
             get_data_func=original_get_data,
             credentials=credentials,
             start_date=start_date,
             end_date=end_date,
+            domain=domain,
             request_timestamps=request_timestamps,
             max_requests_per_minute=15,
         )
@@ -61,3 +71,18 @@ def rate_limited_get_data():
 def use_rate_limited_get_data(monkeypatch, rate_limited_get_data):
     """Route app.get_Data through the shared rate-limited wrapper for all tests."""
     monkeypatch.setattr(app_module, "get_Data", rate_limited_get_data)
+
+
+@pytest.fixture(scope="session")
+def domain():
+    """Domain to use for testing get_credentials and get_Data."""
+    return "for-testing-only.space-track.org"
+
+
+@pytest.fixture(scope="session")
+def credentials(domain):
+    """Get space-track.org credentials or skip tests."""
+    username, password = app_module.get_credentials(domain, args=None)
+    if username is None or password is None:
+        pytest.skip(f"{domain} credentials not available")
+    return username, password

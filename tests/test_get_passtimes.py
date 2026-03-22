@@ -6,17 +6,7 @@ import tempfile
 
 import pytest
 
-from satellite_overpass_identification_tool.app import get_passtimes, get_credentials, domain, _parsedate
-
-
-# Skip if credentials are not available
-@pytest.fixture
-def credentials():
-    """Get space-track.org credentials or skip the test."""
-    username, password = get_credentials(domain, args=None)
-    if username is None or password is None:
-        pytest.skip("space-track.org credentials not available")
-    return username, password
+from satellite_overpass_identification_tool.app import get_passtimes, _parsedate
 
 
 @pytest.mark.integration
@@ -36,7 +26,7 @@ def credentials():
         pytest.param("kara_sea", "2023-12-01", "2023-12-31", 77, 77, 62, id="kara_sea: 2023-12"),
     ],
 )
-def test_get_passtimes(credentials, region, start_date, end_date, lat, lon, expected_rows):
+def test_get_passtimes(credentials, domain, region, start_date, end_date, lat, lon, expected_rows):
     """Load overpass times for given date range and coordinates."""
     username, password = credentials
     
@@ -51,6 +41,7 @@ def test_get_passtimes(credentials, region, start_date, end_date, lat, lon, expe
             lon=lon,
             SPACEUSER=username,
             SPACEPSWD=password,
+            domain=domain,
         )
         
         # Verify output file was created
@@ -93,7 +84,7 @@ def test_get_passtimes(credentials, region, start_date, end_date, lat, lon, expe
         pytest.param("kara_sea", "2023-12-01", 77, 77, "2023-12-01T06:48:37Z", "2023-12-01T07:05:39Z", id="kara_sea: 2023-12-01"),
     ],
 )
-def test_get_passtimes_specific(credentials, region, date, lat, lon, expected_aqua, expected_terra):
+def test_get_passtimes_specific(credentials, region, date, lat, lon, expected_aqua, expected_terra, domain):
     """Verify specific overpass times for a given date and coordinates."""
     username, password = credentials
     
@@ -108,6 +99,7 @@ def test_get_passtimes_specific(credentials, region, date, lat, lon, expected_aq
             lon=lon,
             SPACEUSER=username,
             SPACEPSWD=password,
+            domain=domain,
         )
         
         with open(csvoutpath) as f:
