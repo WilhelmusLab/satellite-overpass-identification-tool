@@ -5,8 +5,8 @@ from collections import deque
 import pytest
 import datetime as dt
 
-import conftest as test_conftest
 import satellite_overpass_identification_tool.app as app_module
+from satellite_overpass_identification_tool.download import _get_data_rate_limited
 
 
 def test_get_data_raises_when_payload_contains_error(monkeypatch, domain):
@@ -53,7 +53,7 @@ def test_rate_limited_helper_short_circuits_after_rate_limit_error(domain):
     request_timestamps = deque()
 
     with pytest.raises(RuntimeError, match="rate limit"):
-        test_conftest._get_data_rate_limited(
+        _get_data_rate_limited(
             get_data_func=_always_rate_limited,
             credentials={"identity": "user", "password": "pass"},
             start_date=dt.date(2025, 5, 15),
@@ -68,7 +68,7 @@ def test_rate_limited_helper_short_circuits_after_rate_limit_error(domain):
     assert error_state["message"] is not None
 
     with pytest.raises(RuntimeError, match="rate limit"):
-        test_conftest._get_data_rate_limited(
+        _get_data_rate_limited(
             get_data_func=_always_rate_limited,
             credentials={"identity": "user", "password": "pass"},
             start_date=dt.date(2025, 5, 15),
