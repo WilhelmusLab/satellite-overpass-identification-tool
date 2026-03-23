@@ -524,7 +524,14 @@ def main():
         domain=args.domain,
     )
 
-    write_passtimes_csv(passtimes, args.csvoutpath, args.start_date, args.end_date, args.lat, args.lon)
+    write_passtimes_csv(
+        passtimes=passtimes,
+        outpath=args.csvoutpath,
+        start_date=args.start_date,
+        end_date=args.end_date,
+        lat=args.lat,
+        lon=args.lon,
+    )
 
 
 if __name__ == "__main__":
