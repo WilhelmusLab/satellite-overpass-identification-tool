@@ -1,12 +1,8 @@
 """Integration tests for satellite overpass time retrieval."""
 
-import csv
-import os
-import tempfile
-
 import pytest
 
-from satellite_overpass_identification_tool.app import get_passtimes, _parsedate
+from satellite_overpass_identification_tool.app import get_passtimes, PASS_TIMES_DTYPE, _parsedate
 
 
 @pytest.mark.integration
@@ -29,34 +25,19 @@ from satellite_overpass_identification_tool.app import get_passtimes, _parsedate
 def test_get_passtimes(credentials, domain, region, start_date, end_date, lat, lon, expected_rows, use_rate_limited_get_data):
     """Load overpass times for given date range and coordinates."""
     username, password = credentials
-    
-    with tempfile.TemporaryDirectory() as tmpdir:
-        csvoutpath = os.path.join(tmpdir, "overpass_times.csv")
-        
-        get_passtimes(
-            start_date=_parsedate(start_date),
-            end_date=_parsedate(end_date),
-            csvoutpath=csvoutpath,
-            lat=lat,
-            lon=lon,
-            SPACEUSER=username,
-            SPACEPSWD=password,
-            domain=domain,
-        )
-        
-        # Verify output file was created
-        assert os.path.exists(csvoutpath)
-        
-        # Verify the file has content (header + data rows)
-        with open(csvoutpath) as f:
-            lines = f.readlines()
-        
-        # Should have header + expected data rows
-        assert len(lines) == expected_rows + 1, f"Expected {expected_rows} data rows + header, got {len(lines)} lines"
-        
-        # Verify header
-        header = lines[0].strip()
-        assert "date" in header.lower() or "satellite" in header.lower()
+
+    passtimes = get_passtimes(
+        start_date=_parsedate(start_date),
+        end_date=_parsedate(end_date),
+        lat=lat,
+        lon=lon,
+        SPACEUSER=username,
+        SPACEPSWD=password,
+        domain=domain,
+    )
+
+    assert len(passtimes) == expected_rows, f"Expected {expected_rows} data rows, got {len(passtimes)}"
+    assert passtimes.dtype == PASS_TIMES_DTYPE
 
 
 @pytest.mark.integration
@@ -87,39 +68,31 @@ def test_get_passtimes(credentials, domain, region, start_date, end_date, lat, l
 def test_get_passtimes_specific(credentials, region, date, lat, lon, expected_aqua, expected_terra, domain, use_rate_limited_get_data):
     """Verify specific overpass times for a given date and coordinates."""
     username, password = credentials
-    
-    with tempfile.TemporaryDirectory() as tmpdir:
-        csvoutpath = os.path.join(tmpdir, "overpass_times.csv")
-        
-        get_passtimes(
-            start_date=_parsedate(date),
-            end_date=_parsedate(date),
-            csvoutpath=csvoutpath,
-            lat=lat,
-            lon=lon,
-            SPACEUSER=username,
-            SPACEPSWD=password,
-            domain=domain,
-        )
-        
-        with open(csvoutpath) as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-        
-        # Extract rows by satellite
-        aqua_rows = [r for r in rows if r["satellite"] == "aqua"]
-        terra_rows = [r for r in rows if r["satellite"] == "terra"]
-        
-        # Verify expected row counts
-        expected_rows = sum(x is not None for x in (expected_aqua, expected_terra))
-        assert len(rows) == expected_rows, f"Expected {expected_rows} rows, got {len(rows)}"
-        
-        # Verify each satellite
-        for expected, sat_rows, name in [
-            (expected_aqua, aqua_rows, "aqua"),
-            (expected_terra, terra_rows, "terra"),
-        ]:
-            if expected is not None:
-                assert len(sat_rows) == 1, f"Expected 1 {name} overpass"
-                assert sat_rows[0]["date"] == date
-                assert sat_rows[0]["overpass time"] == expected, f"{name} time unexpected: {sat_rows[0]['overpass time']}"
+
+    passtimes = get_passtimes(
+        start_date=_parsedate(date),
+        end_date=_parsedate(date),
+        lat=lat,
+        lon=lon,
+        SPACEUSER=username,
+        SPACEPSWD=password,
+        domain=domain,
+    )
+
+    # Extract rows by satellite
+    aqua_rows = passtimes[passtimes["satellite"] == "aqua"]
+    terra_rows = passtimes[passtimes["satellite"] == "terra"]
+
+    # Verify expected row counts
+    expected_rows = sum(x is not None for x in (expected_aqua, expected_terra))
+    assert len(passtimes) == expected_rows, f"Expected {expected_rows} rows, got {len(passtimes)}"
+
+    # Verify each satellite
+    for expected, sat_rows, name in [
+        (expected_aqua, aqua_rows, "aqua"),
+        (expected_terra, terra_rows, "terra"),
+    ]:
+        if expected is not None:
+            assert len(sat_rows) == 1, f"Expected 1 {name} overpass"
+            assert sat_rows[0]["date"] == date
+            assert sat_rows[0]["overpass_time"] == expected, f"{name} time unexpected: {sat_rows[0]['overpass_time']}"
