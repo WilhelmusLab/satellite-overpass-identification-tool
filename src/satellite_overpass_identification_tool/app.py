@@ -53,7 +53,8 @@ PASS_TIMES_DTYPE = np.dtype([
 def _rows_to_structured_array(rows):
     if not rows:
         return np.array([], dtype=PASS_TIMES_DTYPE)
-    return np.array([tuple(row) for row in rows], dtype=PASS_TIMES_DTYPE)
+    structured_array = np.array([tuple(row) for row in rows], dtype=PASS_TIMES_DTYPE)
+    return structured_array
 
 
 def get_passtimes(start_date, end_date, lat, lon, SPACEUSER, SPACEPSWD, domain):
@@ -107,7 +108,8 @@ def get_passtimes(start_date, end_date, lat, lon, SPACEUSER, SPACEPSWD, domain):
         today = getNextDay(today)
         tomorrow = getNextDay(today)
 
-    return _rows_to_structured_array(rows)
+    structured_array = _rows_to_structured_array(rows)
+    return structured_array
 
 
 def write_passtimes_csv(passtimes, outpath, start_date, end_date, lat, lon):
