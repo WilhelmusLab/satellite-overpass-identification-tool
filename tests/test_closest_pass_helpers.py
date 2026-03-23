@@ -17,7 +17,7 @@ from satellite_overpass_identification_tool.app import (
 
 
 @pytest.fixture(scope="module")
-def terra_20250515_events(rate_limited_get_data, credentials):
+def terra_20250515_events(rate_limited_get_data, credentials, domain):
     """Build representative Terra events for 2025-05-15 at 80N, -120E."""
     username, password = credentials
 
@@ -28,6 +28,7 @@ def terra_20250515_events(rate_limited_get_data, credentials):
         credentials={"identity": username, "password": password},
         start_date=start_date,
         end_date=end_date,
+        domain=domain,
     )
 
     terra_data = satellite_data.get("terra", [])
