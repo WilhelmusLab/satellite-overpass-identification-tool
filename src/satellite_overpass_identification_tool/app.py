@@ -65,8 +65,8 @@ def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPS
     # Loop through each day until the end date of interest is reached.
     while today != end_date_next:
         # Get UTC time values of the start of today and the start of tomorrow.
-        t0 = to_utc(today)
-        t1 = to_utc(tomorrow)
+        t0 = ts.utc(today)
+        t1 = ts.utc(tomorrow)
 
         date_iso = str(today)
 
@@ -190,12 +190,6 @@ def timestamp_to_utc(timestamp):
 
     # Pass the parsed components to ts.utc
     return ts.utc(year, month, day, hour, minute, second)
-
-
-def to_utc(t):
-    ts = load.timescale()
-    return ts.utc(t.year, t.month, t.day)
-
 
 
 def _extract_spacetrack_error(payload):
