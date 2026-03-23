@@ -6,8 +6,7 @@ from collections import deque
 import pytest
 
 import satellite_overpass_identification_tool.app as app_module
-from satellite_overpass_identification_tool.download import \
-    _get_data_rate_limited
+from satellite_overpass_identification_tool.download import _get_data_rate_limited
 
 
 def test_get_data_raises_when_payload_contains_error(monkeypatch, domain):

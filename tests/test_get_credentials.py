@@ -8,7 +8,9 @@ import pytest
 
 from satellite_overpass_identification_tool.app import get_credentials
 from satellite_overpass_identification_tool.credentials import (
-    _iter_netrc_domain_candidates, _normalize_domain_for_netrc)
+    _iter_netrc_domain_candidates,
+    _normalize_domain_for_netrc,
+)
 
 DOMAIN = "space-track.org"
 
