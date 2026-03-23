@@ -24,7 +24,7 @@ need to be:
 import requests
 import json
 import datetime
-from skyfield.api import wgs84, load, EarthSatellite
+from skyfield.api import wgs84, load, EarthSatellite, utc
 import numpy as np
 import csv
 import math
@@ -40,11 +40,6 @@ SATELLITES = {
     "terra": {"norad_id": "25994", "ascending": False},
 }
 ID_SATELLITE_MAPPING = {config["norad_id"]: name for name, config in SATELLITES.items()}
-
-
-def _parsedate(date):
-    return datetime.datetime.strptime(date, "%Y-%m-%d").strftime("%m-%d-%Y").split("-")
-
 
 PASS_TIMES_DTYPE = np.dtype(
     [
@@ -67,7 +62,7 @@ def get_passtimes(start_date, end_date, lat, lon, SPACEUSER, SPACEPSWD, domain):
     print(f"Timeframe starts on {start_date}, and ends on {end_date}")
     print(f"Coordinates (x, y): ({lat}, {lon})")
 
-    end_date_next = getNextDay(end_date)
+    end_date_next = end_date + datetime.timedelta(days=1)
 
     satellite_data = get_data(siteCred, start_date, end_date_next, domain)
 
@@ -79,20 +74,18 @@ def get_passtimes(start_date, end_date, lat, lon, SPACEUSER, SPACEPSWD, domain):
 
     # Define today and tomorrow.
     today = start_date
-    tomorrow = getNextDay(start_date)
+    tomorrow = start_date + datetime.timedelta(days=1)
 
     # Collect rows in unfolded format: [date, satellite, overpass_time]
     rows = []
 
     # Loop through each day until the end date of interest is reached.
-    while not np.array_equiv(today, end_date_next):
+    while today != end_date_next:
         # Get UTC time values of the start of today and the start of tomorrow.
-        t0 = to_utc(today)
-        t1 = to_utc(tomorrow)
+        t0 = ts.utc(today)
+        t1 = ts.utc(tomorrow)
 
-        date_str = "-".join(today)
-        m, d, y = map(int, date_str.split("-"))
-        date_iso = str(datetime.date(y, m, d))
+        date_iso = str(today)
 
         # Process each satellite
         for sat_name, sat_config in SATELLITES.items():
@@ -110,8 +103,8 @@ def get_passtimes(start_date, end_date, lat, lon, SPACEUSER, SPACEPSWD, domain):
             if closest_time:
                 rows.append([date_iso, sat_name, f"{date_iso}T{closest_time}Z"])
 
-        today = getNextDay(today)
-        tomorrow = getNextDay(today)
+        today = today + datetime.timedelta(days=1)
+        tomorrow = today + datetime.timedelta(days=1)
 
     structured_array = _rows_to_structured_array(rows)
     return structured_array
@@ -134,7 +127,7 @@ def write_passtimes_csv(passtimes, outpath, start_date, end_date, lat, lon):
     source_fields = ["date", "satellite", "overpass_time"]
     output_fields = ["date", "satellite", "overpass time"]
     rows = [tuple(row[f] for f in source_fields) for row in passtimes]
-    end_date_next = getNextDay(end_date)
+    end_date_next = end_date + datetime.timedelta(days=1)
     csvwrite(start_date, end_date_next, lat, lon, rows, outpath, fields=output_fields)
     return None
 
@@ -185,7 +178,7 @@ def csvwrite(startdate, enddate, lat, lon, rows, outpath, fields=["Date", "Aqua 
     outpath_ = pathlib.Path(outpath)
     
     if outpath_.is_dir():
-        csv_name = f"passtimes_lat{lat}_lon{lon}_{''.join(startdate)}_{''.join(enddate)}.csv"
+        csv_name = f"passtimes_lat{lat}_lon{lon}_{startdate.strftime('%m%d%Y')}_{enddate.strftime('%m%d%Y')}.csv"
         filename = outpath_ / pathlib.Path(csv_name)
     elif outpath_.suffix == ".csv":
         filename = outpath_
@@ -197,51 +190,6 @@ def csvwrite(startdate, enddate, lat, lon, rows, outpath, fields=["Date", "Aqua 
         csvwriter = csv.writer(csvfile)
         csvwriter.writerow(fields)
         csvwriter.writerows(rows)
-
-
-# Returns the date after a given date.
-def getNextDay(date):
-    month = int(date[0])
-    year = int(date[2])
-    day = int(date[1])
-    monthDays = daysInMonth(month, year)
-
-    nextmonth = month
-    nextday = day
-    nextyear = year
-
-    if day == monthDays:
-        nextday = 1
-        nextmonth += 1
-    else:
-        nextday += 1
-    if month == 12 and day == 31:
-        nextyear += 1
-        nextmonth = 1
-
-    nextyearstr = str(nextyear)
-
-    if nextday < 10:
-        nextdaystr = "0" + str(nextday)
-    else:
-        nextdaystr = str(nextday)
-    if nextmonth < 10:
-        nextmonthstr = "0" + str(nextmonth)
-    else:
-        nextmonthstr = str(nextmonth)
-
-    return [nextmonthstr, nextdaystr, nextyearstr]
-
-
-# Returns the number of days in a certain month.
-def daysInMonth(month, year):
-    if month in {1, 3, 5, 7, 8, 10, 12}:
-        return 31
-    if month == 2:
-        if year % 4 == 0:
-            return 29
-        return 28
-    return 30
 
 
 def get_epochs(dataset):
@@ -271,23 +219,10 @@ def get_tli_lines(tle):
 
 def timestamp_to_utc(timestamp):
     ts = load.timescale()
-    # Split the timestamp into date and time components
-    date_part, time_part = timestamp.split("T")
-
-    # Split the date part into year, month, and day
-    year, month, day = map(int, date_part.split("-"))
-
-    # Split the time part into hour, minute, and second
-    hour, minute, second = map(float, time_part.split(":"))
-
-    # Pass the parsed components to ts.utc
-    return ts.utc(year, month, day, hour, minute, second)
-
-
-def to_utc(t):
-    ts = load.timescale()
-    return ts.utc(int(t[2]), int(t[0]), int(t[1]))
-
+    datetime_obj = datetime.datetime.fromisoformat(timestamp)
+    datetime_obj_utc = datetime_obj.replace(tzinfo=utc)
+    ts_utc_object = ts.utc(datetime_obj_utc)
+    return ts_utc_object
 
 
 def _extract_spacetrack_error(payload):
@@ -309,7 +244,7 @@ def get_data(credentials: dict, start_date, end_date, domain):
     Returns:
         dict: Mapping of satellite name to TLE data list. Empty list if no data available.
     """
-    epoch_range = f"{start_date[2]}-{start_date[0]}-{start_date[1]}--{end_date[2]}-{end_date[0]}-{end_date[1]}"
+    epoch_range = f"{start_date.strftime('%Y-%m-%d')}--{end_date.strftime('%Y-%m-%d')}"
     norad_ids = ",".join(
         [str(sat_config["norad_id"]) for sat_config in SATELLITES.values()]
     )
@@ -465,13 +400,13 @@ def main():
     )
     parser.add_argument(
         "--startdate",
-        type=_parsedate,
+        type=datetime.date.fromisoformat,
         dest="start_date",
         help="Start date in format YYYY-MM-DD",
     )
     parser.add_argument(
         "--enddate",
-        type=_parsedate,
+        type=datetime.date.fromisoformat,
         dest="end_date",
         help="End date in format YYYY-MM-DD",
     )

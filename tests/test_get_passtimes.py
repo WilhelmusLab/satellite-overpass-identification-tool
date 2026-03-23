@@ -1,8 +1,10 @@
 """Integration tests for satellite overpass time retrieval."""
 
+import datetime as dt
+
 import pytest
 
-from satellite_overpass_identification_tool.app import get_passtimes, PASS_TIMES_DTYPE, _parsedate
+from satellite_overpass_identification_tool.app import get_passtimes, PASS_TIMES_DTYPE
 
 
 @pytest.mark.integration
@@ -27,8 +29,8 @@ def test_get_passtimes(credentials, domain, region, start_date, end_date, lat, l
     username, password = credentials
 
     passtimes = get_passtimes(
-        start_date=_parsedate(start_date),
-        end_date=_parsedate(end_date),
+        start_date=dt.date.fromisoformat(start_date),
+        end_date=dt.date.fromisoformat(end_date),
         lat=lat,
         lon=lon,
         SPACEUSER=username,
@@ -70,8 +72,8 @@ def test_get_passtimes_specific(credentials, region, date, lat, lon, expected_aq
     username, password = credentials
 
     passtimes = get_passtimes(
-        start_date=_parsedate(date),
-        end_date=_parsedate(date),
+        start_date=dt.date.fromisoformat(date),
+        end_date=dt.date.fromisoformat(date),
         lat=lat,
         lon=lon,
         SPACEUSER=username,
