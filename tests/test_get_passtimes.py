@@ -5,8 +5,7 @@ import datetime as dt
 import pytest
 
 import satellite_overpass_identification_tool.app as app_module
-from satellite_overpass_identification_tool.app import (PASS_TIMES_DTYPE,
-                                                        get_passtimes)
+from satellite_overpass_identification_tool.app import PASS_TIMES_DTYPE, get_passtimes
 
 
 @pytest.mark.integration
