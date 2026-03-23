@@ -741,9 +741,9 @@ def test_get_passtimes_validated_longitude_grid(
     satellite,
     expected_time,
     domain,
-    tolerance_seconds=120,
 ):
     """Validate each satellite overpass is within ~2 minutes of expected_time."""
+    tolerance_seconds=120
     username = validated_grid_data["username"]
     password = validated_grid_data["password"]
     satellite_data = validated_grid_data["satellite_data"]
