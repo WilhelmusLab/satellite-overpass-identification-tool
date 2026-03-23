@@ -40,7 +40,7 @@ ID_SATELLITE_MAPPING = {config["norad_id"]: name for name, config in SATELLITES.
 
 
 def _parsedate(date):
-    return datetime.datetime.strptime(date, "%Y-%m-%d").strftime("%m-%d-%Y").split("-")
+    return datetime.datetime.strptime(date, "%Y-%m-%d").date()
 
 
 def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPSWD, domain):
@@ -49,7 +49,7 @@ def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPS
     print(f"Timeframe starts on {start_date}, and ends on {end_date}")
     print(f"Coordinates (x, y): ({lat}, {lon})")
 
-    end_date_next = getNextDay(end_date)
+    end_date_next = end_date + datetime.timedelta(days=1)
 
     satellite_data = get_data(siteCred, start_date, end_date_next, domain)
 
@@ -61,20 +61,18 @@ def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPS
 
     # Define today and tomorrow.
     today = start_date
-    tomorrow = getNextDay(start_date)
+    tomorrow = start_date + datetime.timedelta(days=1)
 
     # Collect rows in unfolded format: [date, satellite, overpass_time]
     rows = []
 
     # Loop through each day until the end date of interest is reached.
-    while not np.array_equiv(today, end_date_next):
+    while today != end_date_next:
         # Get UTC time values of the start of today and the start of tomorrow.
         t0 = to_utc(today)
         t1 = to_utc(tomorrow)
 
-        date_str = "-".join(today)
-        m, d, y = map(int, date_str.split("-"))
-        date_iso = str(datetime.date(y, m, d))
+        date_iso = str(today)
 
         # Process each satellite
         for sat_name, sat_config in SATELLITES.items():
@@ -92,8 +90,8 @@ def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPS
             if closest_time:
                 rows.append([date_iso, sat_name, f"{date_iso}T{closest_time}Z"])
 
-        today = getNextDay(today)
-        tomorrow = getNextDay(today)
+        today = today + datetime.timedelta(days=1)
+        tomorrow = today + datetime.timedelta(days=1)
 
     fields = ["date", "satellite", "overpass time"]
     csvwrite(start_date, end_date_next, lat, lon, rows, csvoutpath, fields=fields)
@@ -144,7 +142,7 @@ def csvwrite(startdate, enddate, lat, lon, rows, outpath, fields=["Date", "Aqua 
     outpath_ = pathlib.Path(outpath)
     
     if outpath_.is_dir():
-        csv_name = f"passtimes_lat{lat}_lon{lon}_{''.join(startdate)}_{''.join(enddate)}.csv"
+        csv_name = f"passtimes_lat{lat}_lon{lon}_{startdate.strftime('%m%d%Y')}_{enddate.strftime('%m%d%Y')}.csv"
         filename = outpath_ / pathlib.Path(csv_name)
     elif outpath_.suffix == ".csv":
         filename = outpath_
@@ -156,51 +154,6 @@ def csvwrite(startdate, enddate, lat, lon, rows, outpath, fields=["Date", "Aqua 
         csvwriter = csv.writer(csvfile)
         csvwriter.writerow(fields)
         csvwriter.writerows(rows)
-
-
-# Returns the date after a given date.
-def getNextDay(date):
-    month = int(date[0])
-    year = int(date[2])
-    day = int(date[1])
-    monthDays = daysInMonth(month, year)
-
-    nextmonth = month
-    nextday = day
-    nextyear = year
-
-    if day == monthDays:
-        nextday = 1
-        nextmonth += 1
-    else:
-        nextday += 1
-    if month == 12 and day == 31:
-        nextyear += 1
-        nextmonth = 1
-
-    nextyearstr = str(nextyear)
-
-    if nextday < 10:
-        nextdaystr = "0" + str(nextday)
-    else:
-        nextdaystr = str(nextday)
-    if nextmonth < 10:
-        nextmonthstr = "0" + str(nextmonth)
-    else:
-        nextmonthstr = str(nextmonth)
-
-    return [nextmonthstr, nextdaystr, nextyearstr]
-
-
-# Returns the number of days in a certain month.
-def daysInMonth(month, year):
-    if month in {1, 3, 5, 7, 8, 10, 12}:
-        return 31
-    if month == 2:
-        if year % 4 == 0:
-            return 29
-        return 28
-    return 30
 
 
 def get_epochs(dataset):
@@ -245,7 +198,7 @@ def timestamp_to_utc(timestamp):
 
 def to_utc(t):
     ts = load.timescale()
-    return ts.utc(int(t[2]), int(t[0]), int(t[1]))
+    return ts.utc(t.year, t.month, t.day)
 
 
 
@@ -268,7 +221,7 @@ def get_data(credentials: dict, start_date, end_date, domain):
     Returns:
         dict: Mapping of satellite name to TLE data list. Empty list if no data available.
     """
-    epoch_range = f"{start_date[2]}-{start_date[0]}-{start_date[1]}--{end_date[2]}-{end_date[0]}-{end_date[1]}"
+    epoch_range = f"{start_date.strftime('%Y-%m-%d')}--{end_date.strftime('%Y-%m-%d')}"
     norad_ids = ",".join(
         [str(sat_config["norad_id"]) for sat_config in SATELLITES.values()]
     )

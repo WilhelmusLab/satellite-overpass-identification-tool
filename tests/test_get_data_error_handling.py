@@ -35,8 +35,8 @@ def test_get_data_raises_when_payload_contains_error(monkeypatch, domain):
     with pytest.raises(RuntimeError, match="rate limit"):
         app_module.get_data(
             credentials={"identity": "user", "password": "pass"},
-            start_date=["05", "15", "2025"],
-            end_date=["05", "16", "2025"],
+            start_date=dt.date(2025, 5, 15),
+            end_date=dt.date(2025, 5, 16),
             domain=domain
         )
 
