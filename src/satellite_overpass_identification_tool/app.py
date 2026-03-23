@@ -39,10 +39,6 @@ SATELLITES = {
 ID_SATELLITE_MAPPING = {config["norad_id"]: name for name, config in SATELLITES.items()}
 
 
-def _parsedate(date):
-    return datetime.datetime.strptime(date, "%Y-%m-%d").date()
-
-
 def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPSWD, domain):
     siteCred = {"identity": SPACEUSER, "password": SPACEPSWD}
     print(f"Outpath {csvoutpath}")
@@ -377,13 +373,13 @@ def main():
     )
     parser.add_argument(
         "--startdate",
-        type=_parsedate,
+        type=datetime.date.fromisoformat,
         dest="start_date",
         help="Start date in format YYYY-MM-DD",
     )
     parser.add_argument(
         "--enddate",
-        type=_parsedate,
+        type=datetime.date.fromisoformat,
         dest="end_date",
         help="End date in format YYYY-MM-DD",
     )
