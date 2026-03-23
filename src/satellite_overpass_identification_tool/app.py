@@ -28,7 +28,6 @@ import math
 import argparse
 import os
 import pathlib
-import netrc
 
 from .credentials import get_credentials, netrc_message
 
