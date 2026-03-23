@@ -43,11 +43,13 @@ def _parsedate(date):
     return datetime.datetime.strptime(date, "%Y-%m-%d").strftime("%m-%d-%Y").split("-")
 
 
-PASS_TIMES_DTYPE = np.dtype([
-    ("date", "U10"),
-    ("satellite", "U10"),
-    ("overpass_time", "U20"),
-])
+PASS_TIMES_DTYPE = np.dtype(
+    [
+        ("date", "U10"),
+        ("satellite", "U10"),
+        ("overpass_time", "U20"),
+    ]
+)
 
 
 def _rows_to_structured_array(rows):
