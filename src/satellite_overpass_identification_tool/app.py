@@ -1,21 +1,24 @@
+"""Satellite overpass identification tool.
 
-# Code developed by Simon Hatcher (2022)
-# Adapted for use in a Cylc pipeline for IceFloeTracker by Timothy Divoll (2023)
+Authors:
+- Simon Hatcher (2022)
+- Timothy Divoll (2023)
+- John Gerrard Holland (2026)
 
-# ACTION REQUIRED FROM YOU:
-# 1. Update the following parameters in the `flow.cylc` file:
+This module fetches Two-Line Element (TLE) history from space-track.org and computes closest
+Aqua/Terra overpass times for a target location and date range.
 
-# startdate = YYYY-MM-DD
-# enddate = YYYY-MM-DD
-#
-# centroid-x = DD.DDDD
-# centoid-y = DD.DDDD
+Centroid is the approximate point in the middle of your bounding box area of interest
+Your www.space-track.org credentials (https://www.space-track.org/auth/createAccount for free account)
+need to be:
+- provided via --SPACEUSER and --SPACEPSWD command line arguments, or
+- set as environment variables SPACEUSER and SPACEPSWD, or
+- added to your ~/.netrc file in the format:
+  machine www.space-track.org
+      login your_username
+      password your_password
 
-# Centroid is the approximate point in the middle of your bounding box area of interest
-# Your www.space-track.org credentials (https://www.space-track.org/auth/createAccount for free account) need to be set as environment variables in .bash_profile or .zshrc or add to ENV VARS in Windows
-# NOTE: PASSWORD FIELD IS NOT SECURE. DO NOT USE USER/PASSWORD DIRECTLY IN CONFIG FILES.
-
-# 2. A stable internet connection is also required.
+"""
 
 # Package imports.
 import requests
@@ -38,10 +41,24 @@ SATELLITES = {
 }
 ID_SATELLITE_MAPPING = {config["norad_id"]: name for name, config in SATELLITES.items()}
 
+PASS_TIMES_DTYPE = np.dtype(
+    [
+        ("date", "U10"),
+        ("satellite", "U10"),
+        ("overpass_time", "U20"),
+    ]
+)
 
-def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPSWD, domain):
+
+def _rows_to_structured_array(rows):
+    if not rows:
+        return np.array([], dtype=PASS_TIMES_DTYPE)
+    structured_array = np.array([tuple(row) for row in rows], dtype=PASS_TIMES_DTYPE)
+    return structured_array
+
+
+def get_passtimes(start_date, end_date, lat, lon, SPACEUSER, SPACEPSWD, domain):
     siteCred = {"identity": SPACEUSER, "password": SPACEPSWD}
-    print(f"Outpath {csvoutpath}")
     print(f"Timeframe starts on {start_date}, and ends on {end_date}")
     print(f"Coordinates (x, y): ({lat}, {lon})")
 
@@ -89,8 +106,31 @@ def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPS
         today = today + datetime.timedelta(days=1)
         tomorrow = today + datetime.timedelta(days=1)
 
-    fields = ["date", "satellite", "overpass time"]
-    csvwrite(start_date, end_date_next, lat, lon, rows, csvoutpath, fields=fields)
+    structured_array = _rows_to_structured_array(rows)
+    return structured_array
+
+
+def write_passtimes_csv(passtimes, outpath, start_date, end_date, lat, lon):
+    """Write a pass times structured array to a CSV file.
+
+    Args:
+        passtimes: Numpy structured array returned by :func:`get_passtimes`.
+        outpath: Path to the output CSV file, or a directory in which to create
+            one with an auto-generated name.
+        start_date: Start date as ``[MM, DD, YYYY]`` (same value passed to
+            :func:`get_passtimes`).
+        end_date: End date as ``[MM, DD, YYYY]`` (same value passed to
+            :func:`get_passtimes`).
+        lat: Latitude of the area of interest.
+        lon: Longitude of the area of interest.
+    """
+    source_fields = ["date", "satellite", "overpass_time"]
+    output_fields = ["date", "satellite", "overpass time"]
+    rows = [tuple(row[f] for f in source_fields) for row in passtimes]
+    end_date_next = end_date + datetime.timedelta(days=1)
+    csvwrite(start_date, end_date_next, lat, lon, rows, outpath, fields=output_fields)
+    return None
+
 
 def convert_fields_mdy_folded_to_iso8601_unfolded(rows):
     """Convert a row from [MM-DD-YYYY, UTC time (aqua), UTC time (terra)] to [YYYY-MM-DD, Satellite, ISO8601 datetime] format.
@@ -412,7 +452,29 @@ def main():
             "environment variables, or add credentials to your ~/.netrc file."
         )
 
-    get_passtimes(**vars(args))
+    if args.csvoutpath is None:
+        raise SystemExit("Error: --csvoutpath is required")
+
+    passtimes = get_passtimes(
+        start_date=args.start_date,
+        end_date=args.end_date,
+        lat=args.lat,
+        lon=args.lon,
+        SPACEUSER=args.SPACEUSER,
+        SPACEPSWD=args.SPACEPSWD,
+        domain=args.domain,
+    )
+
+    write_passtimes_csv(
+        passtimes=passtimes,
+        outpath=args.csvoutpath,
+        start_date=args.start_date,
+        end_date=args.end_date,
+        lat=args.lat,
+        lon=args.lon,
+    )
+
+    return None
 
 
 if __name__ == "__main__":
