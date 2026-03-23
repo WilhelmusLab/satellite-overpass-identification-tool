@@ -1,21 +1,24 @@
+"""Satellite overpass identification tool.
 
-# Code developed by Simon Hatcher (2022)
-# Adapted for use in a Cylc pipeline for IceFloeTracker by Timothy Divoll (2023)
+Authors:
+- Simon Hatcher (2022)
+- Timothy Divoll (2023)
+- John Gerrard Holland (2026)
 
-# ACTION REQUIRED FROM YOU:
-# 1. Update the following parameters in the `flow.cylc` file:
+This module fetches Two-Line Element (TLE) history from space-track.org and computes closest
+Aqua/Terra overpass times for a target location and date range.
 
-# startdate = YYYY-MM-DD
-# enddate = YYYY-MM-DD
-#
-# centroid-x = DD.DDDD
-# centoid-y = DD.DDDD
+Centroid is the approximate point in the middle of your bounding box area of interest
+Your www.space-track.org credentials (https://www.space-track.org/auth/createAccount for free account)
+need to be:
+- provided via --SPACEUSER and --SPACEPSWD command line arguments, or
+- set as environment variables SPACEUSER and SPACEPSWD, or
+- added to your ~/.netrc file in the format:
+  machine www.space-track.org
+      login your_username
+      password your_password
 
-# Centroid is the approximate point in the middle of your bounding box area of interest
-# Your www.space-track.org credentials (https://www.space-track.org/auth/createAccount for free account) need to be set as environment variables in .bash_profile or .zshrc or add to ENV VARS in Windows
-# NOTE: PASSWORD FIELD IS NOT SECURE. DO NOT USE USER/PASSWORD DIRECTLY IN CONFIG FILES.
-
-# 2. A stable internet connection is also required.
+"""
 
 # Package imports.
 import requests
