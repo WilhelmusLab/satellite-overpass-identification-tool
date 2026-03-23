@@ -20,17 +20,18 @@ need to be:
 
 """
 
+import argparse
+import csv
+import datetime
+import json
+import math
+import pathlib
+
+import numpy as np
+
 # Package imports.
 import requests
-import json
-import datetime
-from skyfield.api import wgs84, load, EarthSatellite, utc
-import numpy as np
-import csv
-import math
-import argparse
-import os
-import pathlib
+from skyfield.api import EarthSatellite, load, utc, wgs84
 
 from .credentials import get_credentials, netrc_message
 
@@ -134,29 +135,29 @@ def write_passtimes_csv(passtimes, outpath, start_date, end_date, lat, lon):
 
 def convert_fields_mdy_folded_to_iso8601_unfolded(rows):
     """Convert a row from [MM-DD-YYYY, UTC time (aqua), UTC time (terra)] to [YYYY-MM-DD, Satellite, ISO8601 datetime] format.
-    
+
     Examples:
         >>> convert_fields_mdy_folded_to_iso8601_unfolded([("03-31-2013", "11:50:20", "14:45:05"),])  # doctest: +NORMALIZE_WHITESPACE
         (['date', 'satellite', 'overpass time'],
-         [['2013-03-31', 'aqua',  '2013-03-31T11:50:20Z'], 
+         [['2013-03-31', 'aqua',  '2013-03-31T11:50:20Z'],
           ['2013-03-31', 'terra', '2013-03-31T14:45:05Z']])
 
         >>> convert_fields_mdy_folded_to_iso8601_unfolded([("12-01-2609", "23:59:01", "00:00:00"),])  # doctest: +NORMALIZE_WHITESPACE
         (['date', 'satellite', 'overpass time'],
-         [['2609-12-01', 'aqua',  '2609-12-01T23:59:01Z'], 
+         [['2609-12-01', 'aqua',  '2609-12-01T23:59:01Z'],
           ['2609-12-01', 'terra', '2609-12-01T00:00:00Z']])
 
-        
+
         >>> convert_fields_mdy_folded_to_iso8601_unfolded([
         ...     ("03-31-2013", "11:50:20", "14:45:05"),
         ...     ("04-01-2013", "11:52:20", "14:43:05"),
         ... ])  # doctest: +NORMALIZE_WHITESPACE
         (['date', 'satellite', 'overpass time'],
-         [['2013-03-31', 'aqua',  '2013-03-31T11:50:20Z'], 
-          ['2013-03-31', 'terra', '2013-03-31T14:45:05Z'], 
-          ['2013-04-01', 'aqua',  '2013-04-01T11:52:20Z'], 
+         [['2013-03-31', 'aqua',  '2013-03-31T11:50:20Z'],
+          ['2013-03-31', 'terra', '2013-03-31T14:45:05Z'],
+          ['2013-04-01', 'aqua',  '2013-04-01T11:52:20Z'],
           ['2013-04-01', 'terra', '2013-04-01T14:43:05Z']])
-        
+
 
     """
     new_fields = ["date", "satellite", "overpass time"]
@@ -165,18 +166,30 @@ def convert_fields_mdy_folded_to_iso8601_unfolded(rows):
         date_mm_dd_yyyy, aqua_time, terra_time = row
         m, d, y = map(int, date_mm_dd_yyyy.split("-"))
         date_yyyy_mm_dd = datetime.date(y, m, d)
-        
-        new_rows.append([f"{date_yyyy_mm_dd}", "aqua", f"{date_yyyy_mm_dd}T{aqua_time}Z"])
-        new_rows.append([f"{date_yyyy_mm_dd}", "terra", f"{date_yyyy_mm_dd}T{terra_time}Z"])
-    
+
+        new_rows.append(
+            [f"{date_yyyy_mm_dd}", "aqua", f"{date_yyyy_mm_dd}T{aqua_time}Z"]
+        )
+        new_rows.append(
+            [f"{date_yyyy_mm_dd}", "terra", f"{date_yyyy_mm_dd}T{terra_time}Z"]
+        )
+
     return new_fields, new_rows
 
 
 # Write CSV of all pass information.
-def csvwrite(startdate, enddate, lat, lon, rows, outpath, fields=["Date", "Aqua pass time", "Terra pass time"]):
-    
+def csvwrite(
+    startdate,
+    enddate,
+    lat,
+    lon,
+    rows,
+    outpath,
+    fields=["Date", "Aqua pass time", "Terra pass time"],
+):
+
     outpath_ = pathlib.Path(outpath)
-    
+
     if outpath_.is_dir():
         csv_name = f"passtimes_lat{lat}_lon{lon}_{startdate.strftime('%m%d%Y')}_{enddate.strftime('%m%d%Y')}.csv"
         filename = outpath_ / pathlib.Path(csv_name)
@@ -288,9 +301,11 @@ def get_data(credentials: dict, start_date, end_date, domain):
     return satellite_data
 
 
-def get_closest_pass_for_satellite(satellite, aoi, t0, t1, ascending=True, altitude_degrees=30):
+def get_closest_pass_for_satellite(
+    satellite, aoi, t0, t1, ascending=True, altitude_degrees=30
+):
     """Find the closest pass time for a single satellite.
-    
+
     Args:
         satellite: EarthSatellite object
         aoi: Area of interest (wgs84.latlon)
@@ -298,10 +313,11 @@ def get_closest_pass_for_satellite(satellite, aoi, t0, t1, ascending=True, altit
         t1: End time
         ascending: Whether to filter for ascending (True) or descending (False) passes
         altitude_degrees: Minimum altitude for pass detection
-    
+
     Returns:
         str: Time of closest pass in HH:MM:SS format, or empty string if no pass found
     """
+
     def process_passes(satellite, events, times):
         passes = []
         pass_dict = {}
@@ -351,7 +367,7 @@ def get_closest_pass_for_satellite(satellite, aoi, t0, t1, ascending=True, altit
             # Skip incomplete passes (no overpass data)
             if "distance" not in pass_dict or "over_lat" not in pass_dict:
                 continue
-            
+
             if "rise_lat" in pass_dict and not np.isnan(pass_dict["rise_lat"]):
                 is_ascending = (
                     (pass_dict["rise_lat"] < pass_dict["over_lat"])
@@ -374,7 +390,9 @@ def get_closest_pass_for_satellite(satellite, aoi, t0, t1, ascending=True, altit
         result = closest_time.split(" ")[3] if closest_time else ""
         return result
 
-    times, events = satellite.find_events(aoi, t0, t1, altitude_degrees=altitude_degrees)
+    times, events = satellite.find_events(
+        aoi, t0, t1, altitude_degrees=altitude_degrees
+    )
     passes = process_passes(satellite, events, times)
     closest_pass = find_closest_pass(passes, ascending=ascending)
     return closest_pass
