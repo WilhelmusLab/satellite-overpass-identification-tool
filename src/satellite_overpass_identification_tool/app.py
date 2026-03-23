@@ -179,17 +179,10 @@ def get_tli_lines(tle):
 
 def timestamp_to_utc(timestamp):
     ts = load.timescale()
-    # Split the timestamp into date and time components
-    date_part, time_part = timestamp.split("T")
-
-    # Split the date part into year, month, and day
-    year, month, day = map(int, date_part.split("-"))
-
-    # Split the time part into hour, minute, and second
-    hour, minute, second = map(float, time_part.split(":"))
-
-    # Pass the parsed components to ts.utc
-    return ts.utc(year, month, day, hour, minute, second)
+    datetime_obj = datetime.datetime.fromisoformat(timestamp)
+    datetime_obj_utc = datetime_obj.replace(tzinfo=utc)
+    ts_utc_object = ts.utc(datetime_obj_utc)
+    return ts_utc_object
 
 
 def _extract_spacetrack_error(payload):
