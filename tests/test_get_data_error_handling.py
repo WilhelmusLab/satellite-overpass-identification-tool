@@ -80,3 +80,18 @@ def test_rate_limited_helper_short_circuits_after_rate_limit_error(domain):
         )
 
     assert call_count["value"] == 1
+
+
+def test_rate_limited_helper_raises_value_error_when_max_requests_too_low(domain):
+    """ValueError is raised immediately when max_requests_per_minute < requests_per_get_data_call."""
+    with pytest.raises(ValueError, match="max_requests_per_minute"):
+        _get_data_rate_limited(
+            get_data_func=lambda **kwargs: None,
+            credentials={"identity": "user", "password": "pass"},
+            start_date=dt.date(2025, 5, 15),
+            end_date=dt.date(2025, 5, 16),
+            domain=domain,
+            request_timestamps=deque(),
+            max_requests_per_minute=1,
+            requests_per_get_data_call=2,
+        )

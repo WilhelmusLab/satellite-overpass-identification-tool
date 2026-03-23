@@ -18,6 +18,12 @@ def _get_data_rate_limited(
     app.get_data performs one login request and one combined request for both
     satellites, so we reserve 2 request slots for each call.
     """
+    if max_requests_per_minute < requests_per_get_data_call:
+        raise ValueError(
+            f"max_requests_per_minute ({max_requests_per_minute}) must be >= "
+            f"requests_per_get_data_call ({requests_per_get_data_call})"
+        )
+
     if rate_limit_error_state is not None:
         message = rate_limit_error_state.get("message")
         if message is not None:
