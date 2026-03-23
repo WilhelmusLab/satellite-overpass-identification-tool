@@ -7,7 +7,6 @@ import pytest
 
 import satellite_overpass_identification_tool.app as app_module
 
-
 EXPECTED_ROWS_80N_105W_2025_05_15 = [
     {
         "date": "2025-05-15",

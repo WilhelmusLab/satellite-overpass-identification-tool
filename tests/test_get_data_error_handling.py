@@ -1,12 +1,13 @@
 """Unit tests for API error handling around get_data and rate-limited wrappers."""
 
+import datetime as dt
 from collections import deque
 
 import pytest
-import datetime as dt
 
 import satellite_overpass_identification_tool.app as app_module
-from satellite_overpass_identification_tool.download import _get_data_rate_limited
+from satellite_overpass_identification_tool.download import \
+    _get_data_rate_limited
 
 
 def test_get_data_raises_when_payload_contains_error(monkeypatch, domain):
@@ -28,7 +29,9 @@ def test_get_data_raises_when_payload_contains_error(monkeypatch, domain):
             return _Response(200, "{}")
 
         def get(self, url):
-            return _Response(200, '[{"error": "You\'ve violated your query rate limit."}]')
+            return _Response(
+                200, '[{"error": "You\'ve violated your query rate limit."}]'
+            )
 
     monkeypatch.setattr(app_module.requests, "Session", lambda: _Session())
 
@@ -37,7 +40,7 @@ def test_get_data_raises_when_payload_contains_error(monkeypatch, domain):
             credentials={"identity": "user", "password": "pass"},
             start_date=dt.date(2025, 5, 15),
             end_date=dt.date(2025, 5, 16),
-            domain=domain
+            domain=domain,
         )
 
 
