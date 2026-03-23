@@ -26,6 +26,7 @@ import datetime
 import json
 import math
 import pathlib
+import sys
 
 import numpy as np
 
@@ -457,6 +458,11 @@ def main():
         help="Base domain for Space-Track API (default: %(default)s). "
         "This is intended for testing with a mock server and should not be changed for normal use.",
     )
+
+    # Check if no arguments were provided (sys.argv[0] is the script name)
+    if len(sys.argv) == 1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)  # Exit with an error code
 
     args = parser.parse_args()
 
