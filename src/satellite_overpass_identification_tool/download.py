@@ -34,7 +34,10 @@ def _get_data_rate_limited(
         while request_timestamps and now - request_timestamps[0] >= window_seconds:
             request_timestamps.popleft()
 
-        if len(request_timestamps) + requests_per_get_data_call <= max_requests_per_minute:
+        if (
+            len(request_timestamps) + requests_per_get_data_call
+            <= max_requests_per_minute
+        ):
             break
 
         sleep_seconds = window_seconds - (now - request_timestamps[0])

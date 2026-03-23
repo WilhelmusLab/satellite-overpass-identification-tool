@@ -28,3 +28,6 @@ addopts = ["--doctest-modules"]
 markers = [
     "integration: marks tests as integration tests (require network and credentials)",
 ]
+
+[tool.isort]
+profile = "black"

@@ -4,7 +4,6 @@ import netrc
 import os
 from urllib.parse import urlparse
 
-
 netrc_message = f"""
 space-track.org SPACEUSER and SPACEPSWD can be set:
 - on the command line,
