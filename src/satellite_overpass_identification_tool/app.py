@@ -133,6 +133,7 @@ def write_passtimes_csv(passtimes, outpath, start_date, end_date, lat, lon):
     rows = [tuple(row[f] for f in source_fields) for row in passtimes]
     end_date_next = getNextDay(end_date)
     csvwrite(start_date, end_date_next, lat, lon, rows, outpath, fields=output_fields)
+    return None
 
 
 def convert_fields_mdy_folded_to_iso8601_unfolded(rows):
