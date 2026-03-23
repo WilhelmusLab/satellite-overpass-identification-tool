@@ -62,9 +62,10 @@ def terra_20250515_events(rate_limited_get_data, credentials, domain):
 
 @pytest.mark.integration
 def test_process_passes_with_representative_terra_events(
-    terra_20250515_events, pass_times_tolerance_minutes=20
+    terra_20250515_events,
 ):
     """process_passes should return parsed overpass dictionaries for representative Terra events."""
+    pass_times_tolerance_minutes = 20
     passes = process_passes(
         satellite=terra_20250515_events["satellite"],
         aoi=terra_20250515_events["aoi"],
