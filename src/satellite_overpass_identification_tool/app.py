@@ -28,50 +28,22 @@ import math
 import argparse
 import os
 import pathlib
-import netrc
 
-# URLs for space track login.
-domain = "space-track.org"
-uriBase = f"https://{domain}"
-requestLogin = "/ajaxauth/login"
+from .credentials import get_credentials, netrc_message
 
 # Satellite configurations: NORAD catalog IDs and orbit direction for pass filtering
 SATELLITES = {
-    "aqua": {"norad_id": 27424, "ascending": True},
-    "terra": {"norad_id": 25994, "ascending": False},
+    "aqua": {"norad_id": "27424", "ascending": True},
+    "terra": {"norad_id": "25994", "ascending": False},
 }
-netrc_message = f"""
-{domain} SPACEUSER and SPACEPSWD can be set:
-- on the command line,
-- as environment variables,
-- or in a .netrc file.
-
-Add the following lines to a file named .netrc in your home directory, 
-replacing USERNAME and PASSWORD with your {domain} credentials:
-
-machine {domain}
-        login USERNAME
-        password PASSWORD
-
-Ensure the file has the correct permissions, 
-e.g., `chmod 600 ~/.netrc` on Unix systems
-to keep your credentials secure.
-"""
-
-# Define error.
-class MyError(Exception):
-    def __init___(self, args):
-        Exception.__init__(
-            self, "my exception was raised with arguments {0}".format(args)
-        )
-        self.args = args
+ID_SATELLITE_MAPPING = {config["norad_id"]: name for name, config in SATELLITES.items()}
 
 
 def _parsedate(date):
     return datetime.datetime.strptime(date, "%Y-%m-%d").strftime("%m-%d-%Y").split("-")
 
 
-def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPSWD):
+def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPSWD, domain):
     siteCred = {"identity": SPACEUSER, "password": SPACEPSWD}
     print(f"Outpath {csvoutpath}")
     print(f"Timeframe starts on {start_date}, and ends on {end_date}")
@@ -79,7 +51,7 @@ def get_passtimes(start_date, end_date, csvoutpath, lat, lon, SPACEUSER, SPACEPS
 
     end_date_next = getNextDay(end_date)
 
-    satellite_data = get_Data(siteCred, start_date, end_date_next)
+    satellite_data = get_data(siteCred, start_date, end_date_next, domain)
 
     # Load in orbital mechanics tool timescale.
     ts = load.timescale()
@@ -276,36 +248,66 @@ def to_utc(t):
     return ts.utc(int(t[2]), int(t[0]), int(t[1]))
 
 
-def get_Data(credentials: dict, start_date, end_date):
+
+def _extract_spacetrack_error(payload):
+    """Return Space-Track error text when payload contains an error entry."""
+    if isinstance(payload, dict) and "error" in payload:
+        return str(payload["error"])
+
+    if isinstance(payload, list) and payload:
+        first_item = payload[0]
+        if isinstance(first_item, dict) and "error" in first_item:
+            return str(first_item["error"])
+
+    return None
+
+
+def get_data(credentials: dict, start_date, end_date, domain):
     """Fetch TLE data for all configured satellites.
-    
+
     Returns:
         dict: Mapping of satellite name to TLE data list. Empty list if no data available.
     """
-    uriBase = "https://www.space-track.org"
-    requestLogin = "/ajaxauth/login"
-    
     epoch_range = f"{start_date[2]}-{start_date[0]}-{start_date[1]}--{end_date[2]}-{end_date[0]}-{end_date[1]}"
+    norad_ids = ",".join(
+        [str(sat_config["norad_id"]) for sat_config in SATELLITES.values()]
+    )
+    sat_names = ",".join(SATELLITES.keys())
+    login_url = f"https://{domain}/ajaxauth/login"
+    data_url = f"https://{domain}/basicspacedata/query/class/gp_history/NORAD_CAT_ID/{norad_ids}/orderby/TLE_LINE1%20ASC/EPOCH/{epoch_range}/format/json"
+
+    satellite_data = {sat_name: [] for sat_name in SATELLITES.keys()}
 
     with requests.Session() as session:
         # Log in with username and password.
-        resp = session.post(uriBase + requestLogin, data=credentials)
+        resp = session.post(login_url, data=credentials)
         if resp.status_code != 200:
-            raise MyError(
-                resp, "POST fail on login. Your username/password may be incorrect. Check the ~/.netrc file or environment variables and try again."
+            raise requests.HTTPError(
+                "Login failed for %s with status code: %s %s\n%s"
+                % (resp.url, resp.status_code, resp.reason, resp.text),
+                response=resp,
+            )
+        print(
+            f"Fetching TLE data for {sat_names} (NORAD {norad_ids}) for epoch range {epoch_range} from {domain}..."
+        )
+        resp = session.get(data_url)
+        if resp.status_code != 200:
+            raise requests.HTTPError(
+                "Data fetch failed for %s with status code: %s %s\n%s"
+                % (resp.url, resp.status_code, resp.reason, resp.text),
+                response=resp,
+            )
+        payload = json.loads(resp.text)
+        error_message = _extract_spacetrack_error(payload)
+        if error_message is not None:
+            raise RuntimeError(
+                f"Space-Track API error for {sat_names} (NORAD {norad_ids}): {error_message}"
             )
 
-        satellite_data = {}
-        for sat_name, sat_config in SATELLITES.items():
-            norad_id = sat_config["norad_id"]
-            resp = session.get(
-                f"{uriBase}/basicspacedata/query/class/gp_history/NORAD_CAT_ID/{norad_id}/orderby/TLE_LINE1%20ASC/EPOCH/{epoch_range}/format/json"
-            )
-            if resp.status_code != 200:
-                print(f"Warning: Failed to fetch TLE data for {sat_name} (NORAD {norad_id}): {resp}")
-                satellite_data[sat_name] = []
-            else:
-                satellite_data[sat_name] = json.loads(resp.text)
+    for item in payload:
+        norad_id = item.get("NORAD_CAT_ID")
+        sat_name = ID_SATELLITE_MAPPING[norad_id]
+        satellite_data[sat_name].append(item)
 
     return satellite_data
 
@@ -402,64 +404,6 @@ def get_closest_pass_for_satellite(satellite, aoi, t0, t1, ascending=True, altit
     return closest_pass
 
 
-def get_credentials(domain, args=None):
-    """Get username and password from args, environment variables, or .netrc file.
-
-    Checks for credentials in the following order:
-    1. The ``args`` namespace (SPACEUSER and SPACEPSWD attributes)
-    2. Environment variables ``SPACEUSER`` and ``SPACEPSWD``
-    3. The ``~/.netrc`` file
-
-    Args:
-        domain: The domain name to look up credentials for.
-        args: Optional argparse namespace with SPACEUSER and SPACEPSWD attributes.
-
-    Returns:
-        A tuple of (username, password). Either value may be None if not found.
-
-    Examples:
-        >>> import argparse
-        >>> ns = argparse.Namespace(SPACEUSER="user1", SPACEPSWD="pass1")
-        >>> get_credentials("example.com", args=ns)
-        ('user1', 'pass1')
-
-        When there aren't any environment variables or .netrc file, both username and password are None:
-        >>> from unittest import mock
-        >>> with mock.patch.dict(os.environ, clear=True):
-        ...     get_credentials("example.com", args=None)
-        (None, None)
-
-    """
-    username = None
-    password = None
-
-    # 1. Check args
-    if args is not None:
-        username = getattr(args, "SPACEUSER", None)
-        password = getattr(args, "SPACEPSWD", None)
-
-    # 2. Check environment variables
-    if username is None:
-        username = os.environ.get("SPACEUSER")
-    if password is None:
-        password = os.environ.get("SPACEPSWD")
-
-    # 3. Check .netrc file
-    if username is None or password is None:
-        try:
-            netrc_creds = netrc.netrc().authenticators(domain)
-            if netrc_creds is not None:
-                login, _, netrc_password = netrc_creds
-                if username is None:
-                    username = login
-                if password is None:
-                    password = netrc_password
-        except (FileNotFoundError, netrc.NetrcParseError):
-            pass
-
-    return username, password
-
-
 def main():
     parser = argparse.ArgumentParser(
         description="Aqua and Terra Satellite Overpass time tool",
@@ -511,15 +455,23 @@ def main():
         type=str,
         help="Path to output CSV file, or a directory, where the output should be written",
     )
+    parser.add_argument(
+        "--domain",
+        "-d",
+        type=str,
+        default="www.space-track.org",
+        help="Base domain for Space-Track API (default: %(default)s). "
+        "This is intended for testing with a mock server and should not be changed for normal use.",
+    )
 
     args = parser.parse_args()
 
-    args.SPACEUSER, args.SPACEPSWD = get_credentials(domain, args=args)
+    args.SPACEUSER, args.SPACEPSWD = get_credentials(args.domain, args=args)
 
     if args.SPACEUSER is None or args.SPACEPSWD is None:
         print(netrc_message)
         raise SystemExit(
-            f"Error: No credentials found for {domain}. "
+            f"Error: No credentials found for {args.domain}. "
             "Provide --SPACEUSER and --SPACEPSWD, set SPACEUSER and SPACEPSWD "
             "environment variables, or add credentials to your ~/.netrc file."
         )
