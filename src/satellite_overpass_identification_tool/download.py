@@ -18,8 +18,10 @@ def _get_data_rate_limited(
     app.get_data performs one login request and one combined request for both
     satellites, so we reserve 2 request slots for each call.
     """
-    if rate_limit_error_state is not None and rate_limit_error_state["message"] is not None:
-        raise RuntimeError(rate_limit_error_state["message"])
+    if rate_limit_error_state is not None:
+        message = rate_limit_error_state.get("message")
+        if message is not None:
+            raise RuntimeError(message)
 
     while True:
         now = time.monotonic()
