@@ -24,11 +24,9 @@ import argparse
 import csv
 import datetime
 import json
-import math
 import pathlib
 from dataclasses import dataclass
 from enum import Enum, IntEnum
-from typing import cast
 
 import numpy as np
 
