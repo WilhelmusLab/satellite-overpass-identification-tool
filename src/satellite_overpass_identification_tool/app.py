@@ -400,10 +400,10 @@ def find_orbit_direction(satellite, overpass_t):
     after_overpass = ts.tt_jd(overpass_t.tt + delta_days)
     before_lat, _ = wgs84.latlon_of(satellite.at(before_overpass))
     after_lat, _ = wgs84.latlon_of(satellite.at(after_overpass))
-    before_lat_deg = cast(float, before_lat.degrees)
-    after_lat_deg = cast(float, after_lat.degrees)
     direction = (
-        Direction.ASCENDING if after_lat_deg > before_lat_deg else Direction.DESCENDING
+        Direction.ASCENDING
+        if after_lat.arcminutes() > before_lat.arcminutes()
+        else Direction.DESCENDING
     )
     return direction
 
