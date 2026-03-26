@@ -390,19 +390,12 @@ def find_orbit_direction(satellite, overpass_t):
 
 def find_closest_pass(passes, direction=Direction.ASCENDING):
     """Return HH:MM:SS for the closest ascending/descending pass."""
-    least_distance = math.inf
-    closest_time = None
-    target_direction = direction
-    filtered_passes = [
-        pass_dict
-        for pass_dict in passes
-        if pass_dict["orbit_direction"] == target_direction
-    ]
-
-    for pass_dict in filtered_passes:
-        if pass_dict["distance"] < least_distance:
-            least_distance = pass_dict["distance"]
-            closest_time = pass_dict["time"]
+    closest_pass = min(
+        (p for p in passes if p["orbit_direction"] == direction),
+        key=lambda p: p["distance"],
+        default=None,
+    )
+    closest_time = closest_pass["time"] if closest_pass is not None else None
     closest_time_str = (
         closest_time.utc_strftime("%H:%M:%S") if closest_time is not None else ""
     )
