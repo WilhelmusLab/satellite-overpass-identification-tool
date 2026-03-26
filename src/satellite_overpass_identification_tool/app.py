@@ -392,6 +392,10 @@ def process_passes(satellite, aoi, events, times):
 
 
 def find_orbit_direction(satellite, overpass_t, delta_seconds=30.0):
+    """Determine whether the satellite is ascending or descending at the time of overpass.
+
+    Method: compare the latitude `delta_seconds` before and after the overpass time.
+    """
     delta_days = delta_seconds / SECONDS_PER_DAY
     ts = overpass_t.ts
     before_overpass = ts.tt_jd(overpass_t.tt - delta_days)
