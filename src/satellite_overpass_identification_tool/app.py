@@ -26,6 +26,7 @@ import datetime
 import json
 import math
 import pathlib
+from dataclasses import dataclass
 from enum import Enum, IntEnum
 from typing import cast
 
@@ -49,12 +50,20 @@ class PassEvent(IntEnum):
     SET = 2
 
 
-# Satellite configurations: NORAD catalog IDs and orbit direction for pass filtering
-SATELLITES = {
-    "aqua": {"norad_id": "27424", "direction": Direction.ASCENDING},
-    "terra": {"norad_id": "25994", "direction": Direction.DESCENDING},
-}
-ID_SATELLITE_MAPPING = {config["norad_id"]: name for name, config in SATELLITES.items()}
+@dataclass
+class Satellite:
+    name: str
+    norad_id: str
+    direction: Direction
+
+
+SATELLITES = [
+    Satellite(name="aqua", norad_id="27424", direction=Direction.ASCENDING),
+    Satellite(name="terra", norad_id="25994", direction=Direction.DESCENDING),
+]
+
+SATELLITES_FROM_NAME = {sat.name: sat for sat in SATELLITES}
+SATELLITES_FROM_NORAD_ID = {sat.norad_id: sat for sat in SATELLITES}
 
 PASS_TIMES_DTYPE = np.dtype(
     [
@@ -103,20 +112,20 @@ def get_passtimes(start_date, end_date, lat, lon, SPACEUSER, SPACEPSWD, domain):
         date_iso = str(today)
 
         # Process each satellite
-        for sat_name, sat_config in SATELLITES.items():
-            data = satellite_data.get(sat_name, [])
+        for sat in SATELLITES:
+            data = satellite_data.get(sat.name, [])
             if not data:
                 continue
 
             min_diff_index, _ = getclosestepoch(t0, data)
             tle_line1, tle_line2 = get_tli_lines(data[min_diff_index])
-            satellite = EarthSatellite(tle_line1, tle_line2, sat_name.upper(), ts)
+            satellite = EarthSatellite(tle_line1, tle_line2, sat.name.upper(), ts)
 
             closest_time = get_closest_pass_for_satellite(
-                satellite, aoi, t0, t1, direction=sat_config["direction"]
+                satellite, aoi, t0, t1, direction=sat.direction
             )
             if closest_time:
-                rows.append([date_iso, sat_name, f"{date_iso}T{closest_time}Z"])
+                rows.append([date_iso, sat.name, f"{date_iso}T{closest_time}Z"])
 
         today = today + datetime.timedelta(days=1)
         tomorrow = today + datetime.timedelta(days=1)
@@ -272,14 +281,12 @@ def get_data(credentials: dict, start_date, end_date, domain):
         dict: Mapping of satellite name to TLE data list. Empty list if no data available.
     """
     epoch_range = f"{start_date.strftime('%Y-%m-%d')}--{end_date.strftime('%Y-%m-%d')}"
-    norad_ids = ",".join(
-        [str(sat_config["norad_id"]) for sat_config in SATELLITES.values()]
-    )
-    sat_names = ",".join(SATELLITES.keys())
+    norad_ids = ",".join([sat.norad_id for sat in SATELLITES])
+    sat_names = ",".join([sat.name for sat in SATELLITES])
     login_url = f"https://{domain}/ajaxauth/login"
     data_url = f"https://{domain}/basicspacedata/query/class/gp_history/NORAD_CAT_ID/{norad_ids}/orderby/TLE_LINE1%20ASC/EPOCH/{epoch_range}/format/json"
 
-    satellite_data = {sat_name: [] for sat_name in SATELLITES.keys()}
+    satellite_data = {sat.name: [] for sat in SATELLITES}
 
     with requests.Session() as session:
         # Log in with username and password.
@@ -309,8 +316,8 @@ def get_data(credentials: dict, start_date, end_date, domain):
 
     for item in payload:
         norad_id = item.get("NORAD_CAT_ID")
-        sat_name = ID_SATELLITE_MAPPING[norad_id]
-        satellite_data[sat_name].append(item)
+        sat = SATELLITES_FROM_NORAD_ID[norad_id]
+        satellite_data[sat.name].append(item)
 
     return satellite_data
 
