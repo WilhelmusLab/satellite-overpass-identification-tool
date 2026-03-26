@@ -34,7 +34,7 @@ import numpy as np
 
 # Package imports.
 import requests
-from skyfield.api import EarthSatellite, load, utc, wgs84
+from skyfield.api import Angle, EarthSatellite, Time, load, utc, wgs84
 
 from .credentials import get_credentials, netrc_message
 
@@ -322,6 +322,19 @@ def get_data(credentials: dict, start_date, end_date, domain):
     return satellite_data
 
 
+@dataclass
+class OverpassInfo:
+    rise_lat: Angle
+    rise_lon: Angle
+    distance: float
+    time: Time
+    over_lat: Angle
+    over_lon: Angle
+    set_lat: Angle
+    set_lon: Angle
+    direction: Direction
+
+
 def process_passes(satellite, aoi, events, times):
     """Build pass dictionaries from Skyfield event streams.
 
@@ -361,17 +374,17 @@ def process_passes(satellite, aoi, events, times):
         direction = find_orbit_direction(satellite, overpass_t)
 
         passes.append(
-            {
-                "rise_lat": riselat.degrees,
-                "rise_lon": riselon.degrees,
-                "distance": distance.km,
-                "time": overpass_t,
-                "over_lat": overlat.degrees,
-                "over_lon": overlon.degrees,
-                "set_lat": setlat.degrees,
-                "set_lon": setlon.degrees,
-                "orbit_direction": direction,
-            }
+            OverpassInfo(
+                rise_lat=riselat,
+                rise_lon=riselon,
+                distance=distance.km,
+                time=overpass_t,
+                over_lat=overlat,
+                over_lon=overlon,
+                set_lat=setlat,
+                set_lon=setlon,
+                direction=direction,
+            )
         )
         i += 3
 
@@ -398,11 +411,11 @@ def find_orbit_direction(satellite, overpass_t):
 def find_closest_pass(passes, direction=Direction.ASCENDING):
     """Return HH:MM:SS for the closest ascending/descending pass."""
     closest_pass = min(
-        (p for p in passes if p["orbit_direction"] == direction),
-        key=lambda p: p["distance"],
+        (p for p in passes if p.direction == direction),
+        key=lambda p: p.distance,
         default=None,
     )
-    closest_time = closest_pass["time"] if closest_pass is not None else None
+    closest_time = closest_pass.time if closest_pass is not None else None
     closest_time_str = (
         closest_time.utc_strftime("%H:%M:%S") if closest_time is not None else ""
     )

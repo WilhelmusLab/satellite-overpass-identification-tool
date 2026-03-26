@@ -8,6 +8,7 @@ from skyfield.api import EarthSatellite, load, utc, wgs84
 
 from satellite_overpass_identification_tool.app import (
     Direction,
+    OverpassInfo,
     find_closest_pass,
     get_closest_pass_for_satellite,
     get_tli_lines,
@@ -75,14 +76,7 @@ def test_process_passes_with_representative_terra_events(
 
     assert isinstance(passes, list)
     assert passes
-    assert any(
-        "distance" in pass_dict
-        and "time" in pass_dict
-        and "over_lat" in pass_dict
-        and pass_dict.get("orbit_direction")
-        in {Direction.ASCENDING, Direction.DESCENDING}
-        for pass_dict in passes
-    )
+    assert all(isinstance(overpassinfo, OverpassInfo) for overpassinfo in passes)
 
     expected_passes = [
         ("00:22:00", Direction.ASCENDING),
@@ -97,8 +91,8 @@ def test_process_passes_with_representative_terra_events(
 
     for expectation, actual in zip(expected_passes, passes):
         expected_time, expected_direction = expectation
-        actual_time = actual["time"].utc_strftime("%H:%M:%S")
-        actual_direction = actual.get("orbit_direction")
+        actual_time = actual.time.utc_strftime("%H:%M:%S")
+        actual_direction = actual.direction
         assert (
             actual_direction == expected_direction
         ), f"Expected direction {expected_direction.value} but got {actual_direction.value if actual_direction else 'None'}"
