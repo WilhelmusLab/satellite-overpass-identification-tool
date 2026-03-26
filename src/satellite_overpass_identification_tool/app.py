@@ -461,8 +461,8 @@ def main():
 
     # Check if no arguments were provided (sys.argv[0] is the script name)
     if len(sys.argv) == 1:
-        parser.print_help(sys.stderr)
-        sys.exit(1)  # Exit with an error code
+        parser.print_help()
+        parser.exit(0)
 
     args = parser.parse_args()
 
