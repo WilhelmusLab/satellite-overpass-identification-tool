@@ -38,6 +38,8 @@ from skyfield.api import Angle, EarthSatellite, Time, load, utc, wgs84
 
 from .credentials import get_credentials, netrc_message
 
+SECONDS_PER_DAY = 86400.0
+
 
 class Direction(Enum):
     ASCENDING = "ascending"
@@ -391,10 +393,8 @@ def process_passes(satellite, aoi, events, times):
     return passes
 
 
-def find_orbit_direction(satellite, overpass_t):
-    delta_seconds = 30.0
-    seconds_per_day = 86400.0
-    delta_days = delta_seconds / seconds_per_day
+def find_orbit_direction(satellite, overpass_t, delta_seconds=30.0):
+    delta_days = delta_seconds / SECONDS_PER_DAY
     ts = overpass_t.ts
     before_overpass = ts.tt_jd(overpass_t.tt - delta_days)
     after_overpass = ts.tt_jd(overpass_t.tt + delta_days)
