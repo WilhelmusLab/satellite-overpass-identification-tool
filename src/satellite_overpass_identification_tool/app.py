@@ -477,7 +477,7 @@ def main():
         )
 
     if args.csvoutpath is None:
-        raise SystemExit("Error: --csvoutpath is required")
+        raise SystemExit("Error: --csvoutpath is required.")
 
     passtimes = get_passtimes(
         start_date=args.start_date,
