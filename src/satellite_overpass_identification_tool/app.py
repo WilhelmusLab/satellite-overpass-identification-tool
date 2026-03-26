@@ -62,7 +62,6 @@ SATELLITES = [
     Satellite(name="terra", norad_id="25994", direction=Direction.DESCENDING),
 ]
 
-SATELLITES_FROM_NAME = {sat.name: sat for sat in SATELLITES}
 SATELLITES_FROM_NORAD_ID = {sat.norad_id: sat for sat in SATELLITES}
 
 PASS_TIMES_DTYPE = np.dtype(
