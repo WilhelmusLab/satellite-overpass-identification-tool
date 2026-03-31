@@ -1,0 +1,24 @@
+# See https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-dependency-updates
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependencies"
+    ignore:
+      - dependency-name: "pip"
+        versions: ["*"]
+    groups:
+      minor-patches:
+        # Include all dependencies
+        patterns:
+          - "*"
+        # Only group minor and patch updates
+        update-types:
+          - "minor"
+          - "patch"
