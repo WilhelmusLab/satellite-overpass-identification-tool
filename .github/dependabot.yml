@@ -9,8 +9,6 @@ updates:
     directory: "/" 
     schedule:
       interval: "semiannually"
-    groups: 
-      pip-updates:
 - package-ecosystem: "github-actions" 
     directory: "/" 
     schedule:
