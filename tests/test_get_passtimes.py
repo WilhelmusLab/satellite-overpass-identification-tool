@@ -4,6 +4,7 @@ import datetime as dt
 
 import pytest
 
+import satellite_overpass_identification_tool.app as app_module
 from satellite_overpass_identification_tool.app import PASS_TIMES_DTYPE, get_passtimes
 
 
@@ -324,3 +325,455 @@ def test_get_passtimes_specific(
             assert (
                 sat_rows[0]["overpass_time"] == expected
             ), f"{name} time unexpected: {sat_rows[0]['overpass_time']}"
+
+
+@pytest.fixture(scope="module")
+def validated_grid_data(rate_limited_get_data, credentials, domain):
+    """Fetch and cache one day of TLE data for the validated overpass grid."""
+    username, password = credentials
+
+    date = "2025-05-15"
+    start_date = dt.date.fromisoformat(date)
+    end_date = dt.date.fromisoformat(date)
+    end_date_next = end_date + dt.timedelta(days=1)
+
+    satellite_data = rate_limited_get_data(
+        credentials={"identity": username, "password": password},
+        start_date=start_date,
+        end_date=end_date_next,
+        domain=domain,
+    )
+
+    for satellite_name in ("aqua", "terra"):
+        sat_data = satellite_data.get(satellite_name, [])
+        if not sat_data or "EPOCH" not in sat_data[0]:
+            pytest.skip(
+                f"{satellite_name} TLE data unavailable "
+                "(likely query throttled by space-track.org)"
+            )
+
+    return {
+        "username": username,
+        "password": password,
+        "satellite_data": satellite_data,
+    }
+
+
+OVERPASS_VALIDATION_CASES = [
+    (
+        "2025-05-15",
+        80,
+        -180.0,
+        "aqua",
+        "2025-05-15T23:02:58Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -180.0,
+        "terra",
+        "2025-05-15T00:24:44Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -165.0,
+        "aqua",
+        "2025-05-15T21:24:46Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -165.0,
+        "terra",
+        "2025-05-15T00:24:10Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -150.0,
+        "aqua",
+        "2025-05-15T21:24:10Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -150.0,
+        "terra",
+        "2025-05-15T23:25:09Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -135.0,
+        "aqua",
+        "2025-05-15T19:45:56Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -135.0,
+        "terra",
+        "2025-05-15T21:46:53Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -120.0,
+        "aqua",
+        "2025-05-15T18:07:44Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -120.0,
+        "terra",
+        "2025-05-15T21:46:30Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -105.0,
+        "aqua",
+        "2025-05-15T18:07:07Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -105.0,
+        "terra",
+        "2025-05-15T20:08:03Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -90.0,
+        "aqua",
+        "2025-05-15T16:28:54Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -90.0,
+        "terra",
+        "2025-05-15T18:29:46Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -75.0,
+        "aqua",
+        "2025-05-15T16:28:19Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -75.0,
+        "terra",
+        "2025-05-15T18:29:11Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -60.0,
+        "aqua",
+        "2025-05-15T14:50:05Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -60.0,
+        "terra",
+        "2025-05-15T16:50:55Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -45.0,
+        "aqua",
+        "2025-05-15T13:11:53Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -45.0,
+        "terra",
+        "2025-05-15T15:12:37Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -30.0,
+        "aqua",
+        "2025-05-15T13:11:16Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -30.0,
+        "terra",
+        "2025-05-15T15:12:04Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -15.0,
+        "aqua",
+        "2025-05-15T11:33:03Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -15.0,
+        "terra",
+        "2025-05-15T13:33:48Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        0.0,
+        "aqua",
+        "2025-05-15T11:32:28Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        0.0,
+        "terra",
+        "2025-05-15T13:33:13Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        15.0,
+        "aqua",
+        "2025-05-15T09:54:13Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        15.0,
+        "terra",
+        "2025-05-15T11:54:57Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        30.0,
+        "aqua",
+        "2025-05-15T08:16:00Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        30.0,
+        "terra",
+        "2025-05-15T10:16:39Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        45.0,
+        "aqua",
+        "2025-05-15T08:15:25Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        45.0,
+        "terra",
+        "2025-05-15T10:16:06Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        60.0,
+        "aqua",
+        "2025-05-15T06:37:11Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        60.0,
+        "terra",
+        "2025-05-15T08:37:50Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        75.0,
+        "aqua",
+        "2025-05-15T04:59:00Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        75.0,
+        "terra",
+        "2025-05-15T08:37:14Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        90.0,
+        "aqua",
+        "2025-05-15T04:58:22Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        90.0,
+        "terra",
+        "2025-05-15T06:58:59Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        105.0,
+        "aqua",
+        "2025-05-15T03:20:10Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        105.0,
+        "terra",
+        "2025-05-15T05:20:41Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        120.0,
+        "aqua",
+        "2025-05-15T03:19:34Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        120.0,
+        "terra",
+        "2025-05-15T05:20:08Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        135.0,
+        "aqua",
+        "2025-05-15T01:41:20Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        135.0,
+        "terra",
+        "2025-05-15T03:41:52Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        150.0,
+        "aqua",
+        "2025-05-15T00:03:08Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        150.0,
+        "terra",
+        "2025-05-15T03:41:16Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        165.0,
+        "aqua",
+        "2025-05-15T00:02:31Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        165.0,
+        "terra",
+        "2025-05-15T02:03:01Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        180.0,
+        "aqua",
+        "2025-05-15T23:02:58Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        180.0,
+        "terra",
+        "2025-05-15T00:24:44Z",  # checked
+    ),
+    (
+        "2025-05-15",
+        80,
+        -175.3,
+        "aqua",
+        "2025-05-15T23:02:48Z",  # checked (matches the overpass for the correct day)
+    ),
+    (
+        "2025-05-15",
+        80,
+        -175.3,
+        "terra",
+        "2025-05-15T00:24:34Z",  # checked (matches the overpass for the correct day)
+    ),
+]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "date,lat,lon,satellite,expected_time",
+    OVERPASS_VALIDATION_CASES,
+)
+def test_get_passtimes_validated_longitude_grid(
+    validated_grid_data,
+    monkeypatch,
+    date,
+    lat,
+    lon,
+    satellite,
+    expected_time,
+    domain,
+):
+    """Validate each satellite overpass is within ~2 minutes of expected_time."""
+    tolerance_seconds=120
+    username = validated_grid_data["username"]
+    password = validated_grid_data["password"]
+    satellite_data = validated_grid_data["satellite_data"]
+
+    monkeypatch.setattr(
+        app_module,
+        "get_data",
+        lambda credentials, start_date, end_date, domain: satellite_data,
+    )
+
+    passtimes = get_passtimes(
+        start_date=dt.date.fromisoformat(date),
+        end_date=dt.date.fromisoformat(date),
+        lat=lat,
+        lon=lon,
+        SPACEUSER=username,
+        SPACEPSWD=password,
+        domain=domain,
+    )
+
+    sat_rows = passtimes[passtimes["satellite"] == satellite]
+    assert len(sat_rows) == 1, f"Expected 1 {satellite} overpass for lon={lon}"
+    assert sat_rows[0]["date"] == date
+
+    observed_dt = dt.datetime.fromisoformat(
+        sat_rows[0]["overpass_time"].replace("Z", "+00:00")
+    )
+    expected_dt = dt.datetime.fromisoformat(expected_time.replace("Z", "+00:00"))
+
+    time_delta_seconds = abs((observed_dt - expected_dt).total_seconds())
+    assert (
+        time_delta_seconds <= tolerance_seconds
+    ), f"{satellite} overpass at lon={lon} differs from expected by {time_delta_seconds:.0f}s"
