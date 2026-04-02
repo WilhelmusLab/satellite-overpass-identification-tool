@@ -25,12 +25,11 @@ import csv
 import datetime
 import json
 import pathlib
+import sys
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 
 import numpy as np
-
-# Package imports.
 import requests
 from skyfield.api import Angle, EarthSatellite, Time, load, utc, wgs84
 
@@ -512,6 +511,11 @@ def main():
         "This is intended for testing with a mock server and should not be changed for normal use.",
     )
 
+    # Check if no arguments were provided (sys.argv[0] is the script name)
+    if len(sys.argv) == 1:
+        parser.print_help()
+        parser.exit(0)
+
     args = parser.parse_args()
 
     args.SPACEUSER, args.SPACEPSWD = get_credentials(args.domain, args=args)
@@ -525,7 +529,7 @@ def main():
         )
 
     if args.csvoutpath is None:
-        raise SystemExit("Error: --csvoutpath is required")
+        raise SystemExit("Error: --csvoutpath is required.")
 
     passtimes = get_passtimes(
         start_date=args.start_date,
