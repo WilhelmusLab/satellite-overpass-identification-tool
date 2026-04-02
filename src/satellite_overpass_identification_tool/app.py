@@ -22,15 +22,14 @@ need to be:
 
 import argparse
 import csv
-from dataclasses import dataclass
 import datetime
-from enum import Enum, IntEnum
 import json
 import pathlib
 import sys
+from dataclasses import dataclass
+from enum import Enum, IntEnum
 
 import numpy as np
-
 import requests
 from skyfield.api import Angle, EarthSatellite, Time, load, utc, wgs84
 
