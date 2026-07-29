@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pyfakefs"]
+dev = ["pytest", "pyfakefs", "ruff"]
 
 [project.scripts]
 soit="satellite_overpass_identification_tool:main"
@@ -32,3 +32,25 @@ markers = [
 
 [tool.isort]
 profile = "black"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+
+[tool.ruff.lint]
+select = [
+  "E",
+  "F",
+  "I",
+  "B",
+]
+ignore = [
+  "E501",
+  "F401",
+  "F541",
+  "B006",
+  "B905",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["E501"]
