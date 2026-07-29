@@ -23,11 +23,13 @@ need to be:
 import argparse
 import csv
 import datetime
+import gzip
 import json
 import pathlib
 import sys
 from dataclasses import dataclass
 from enum import Enum, IntEnum
+from urllib.parse import urlparse
 
 import numpy as np
 import requests
@@ -79,14 +81,29 @@ def _rows_to_structured_array(rows):
     return structured_array
 
 
-def get_passtimes(start_date, end_date, lat, lon, SPACEUSER, SPACEPSWD, domain):
+def get_passtimes(
+    start_date,
+    end_date,
+    lat,
+    lon,
+    SPACEUSER=None,
+    SPACEPSWD=None,
+    domain="www.space-track.org",
+    data_source="spacetrack",
+    gcs_base_url=None,
+):
     siteCred = {"identity": SPACEUSER, "password": SPACEPSWD}
     print(f"Timeframe starts on {start_date}, and ends on {end_date}")
     print(f"Coordinates (x, y): ({lat}, {lon})")
 
     end_date_next = end_date + datetime.timedelta(days=1)
 
-    satellite_data = get_data(siteCred, start_date, end_date_next, domain)
+    if data_source == "gcs":
+        if not gcs_base_url:
+            raise ValueError("--gcs-base-url is required when --data-source=gcs")
+        satellite_data = get_data_from_gcs(start_date, end_date_next, gcs_base_url)
+    else:
+        satellite_data = get_data(siteCred, start_date, end_date_next, domain)
 
     # Load in orbital mechanics tool timescale.
     ts = load.timescale()
@@ -115,7 +132,7 @@ def get_passtimes(start_date, end_date, lat, lon, SPACEUSER, SPACEPSWD, domain):
             if not data:
                 continue
 
-            min_diff_index, _ = getclosestepoch(t0, data)
+            min_diff_index, _ = getclosestepoch(t0, data, ts=ts, sat_name=sat.name)
             tle_line1, tle_line2 = get_tli_lines(data[min_diff_index])
             satellite = EarthSatellite(tle_line1, tle_line2, sat.name.upper(), ts)
 
@@ -226,37 +243,29 @@ def csvwrite(
         csvwriter.writerows(rows)
 
 
-def get_epochs(dataset):
-    return [timestamp_to_utc(item["EPOCH"]) for item in dataset]
-
-
-def getclosestepoch(t0, dataset):
-    epochs = get_epochs(dataset)
-
-    # sequentially compute the absolute difference between the epoch and t0
-    # keeping track of the index and value of the minimum difference
+def getclosestepoch(t0, dataset, ts=None, sat_name="satellite"):
+    # Select the closest TLE by constructing EarthSatellite objects and comparing
+    # their parsed epoch against the requested time.
+    ts = ts or load.timescale()
     min_diff = float("inf")
     min_diff_index = 0
-    for i, epoch in enumerate(epochs):
+    min_diff_epoch = None
+    for i, item in enumerate(dataset):
+        line1, line2 = get_tli_lines(item)
+        satellite = EarthSatellite(line1, line2, sat_name.upper(), ts)
+        epoch = satellite.epoch
         diff = abs(t0 - epoch)
         if diff < min_diff:
             min_diff = diff
             min_diff_index = i
+            min_diff_epoch = epoch
 
-    return min_diff_index, epochs[min_diff_index]
+    return min_diff_index, min_diff_epoch
 
 
 def get_tli_lines(tle):
     line1, line2 = tle["TLE_LINE1"], tle["TLE_LINE2"]
     return line1, line2
-
-
-def timestamp_to_utc(timestamp):
-    ts = load.timescale()
-    datetime_obj = datetime.datetime.fromisoformat(timestamp)
-    datetime_obj_utc = datetime_obj.replace(tzinfo=utc)
-    ts_utc_object = ts.utc(datetime_obj_utc)
-    return ts_utc_object
 
 
 def _extract_spacetrack_error(payload):
@@ -270,6 +279,135 @@ def _extract_spacetrack_error(payload):
             return str(first_item["error"])
 
     return None
+
+
+def _month_range(start_date, end_date):
+    start = datetime.date(start_date.year, start_date.month, 1)
+    end = datetime.date(end_date.year, end_date.month, 1)
+    current = start
+    while current <= end:
+        yield current.year, current.month
+        if current.month == 12:
+            current = datetime.date(current.year + 1, 1, 1)
+        else:
+            current = datetime.date(current.year, current.month + 1, 1)
+
+
+def _fetch_tle_partition(session, url):
+    resp = session.get(url)
+    if resp.status_code == 404:
+        return None
+    if resp.status_code != 200:
+        raise requests.HTTPError(
+            "GCS data fetch failed for %s with status code: %s %s\n%s"
+            % (resp.url, resp.status_code, resp.reason, resp.text),
+            response=resp,
+        )
+
+    content = resp.content
+    if url.endswith(".gz"):
+        content = gzip.decompress(content)
+
+    rows = []
+    for line in content.decode("utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        rows.append(json.loads(line))
+    return rows
+
+
+def _read_tle_partition_file(path):
+    if path.suffix == ".gz":
+        with gzip.open(path, "rt", encoding="utf-8") as file_handle:
+            lines = file_handle.readlines()
+    else:
+        with open(path, "r", encoding="utf-8") as file_handle:
+            lines = file_handle.readlines()
+
+    rows = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        rows.append(json.loads(line))
+    return rows
+
+
+def _resolve_local_partition_root(gcs_base_url):
+    parsed = urlparse(gcs_base_url)
+    if parsed.scheme == "file":
+        return pathlib.Path(parsed.path)
+
+    if parsed.scheme in ("http", "https"):
+        return None
+
+    candidate = pathlib.Path(gcs_base_url)
+    return candidate if candidate.exists() else None
+
+
+def get_data_from_gcs(start_date, end_date, gcs_base_url):
+    """Fetch TLE data from partitioned JSONL files.
+
+    Expected layout under gcs_base_url (for both HTTPS and local directories):
+    - norad=<id>/year=<YYYY>/month=<MM>/tle.jsonl
+      or
+    - norad=<id>/year=<YYYY>/month=<MM>/tle.jsonl.gz
+    """
+    base_url = gcs_base_url.rstrip("/")
+    local_root = _resolve_local_partition_root(base_url)
+    satellite_data = {sat.name: [] for sat in SATELLITES}
+
+    if local_root is not None:
+        for sat in SATELLITES:
+            for year, month in _month_range(start_date, end_date):
+                partition_dir = (
+                    local_root
+                    / f"norad={sat.norad_id}"
+                    / f"year={year:04d}"
+                    / f"month={month:02d}"
+                )
+                partition = None
+                for leaf in ("tle.jsonl", "tle.jsonl.gz"):
+                    path = partition_dir / leaf
+                    if not path.exists():
+                        continue
+                    partition = _read_tle_partition_file(path)
+                    break
+
+                if partition is None:
+                    continue
+
+                for item in partition:
+                    item_norad = str(item.get("NORAD_CAT_ID", ""))
+                    if item_norad != sat.norad_id:
+                        continue
+                    satellite_data[sat.name].append(item)
+        return satellite_data
+
+    with requests.Session() as session:
+        for sat in SATELLITES:
+            for year, month in _month_range(start_date, end_date):
+                base = (
+                    f"{base_url}/norad={sat.norad_id}/year={year:04d}/month={month:02d}"
+                )
+                partition = None
+                for leaf in ("tle.jsonl", "tle.jsonl.gz"):
+                    url = f"{base}/{leaf}"
+                    partition = _fetch_tle_partition(session, url)
+                    if partition is not None:
+                        break
+
+                if partition is None:
+                    continue
+
+                for item in partition:
+                    item_norad = str(item.get("NORAD_CAT_ID", ""))
+                    if item_norad != sat.norad_id:
+                        continue
+                    satellite_data[sat.name].append(item)
+
+    return satellite_data
 
 
 def get_data(credentials: dict, start_date, end_date, domain):
@@ -510,6 +648,18 @@ def main():
         help="Base domain for Space-Track API (default: %(default)s). "
         "This is intended for testing with a mock server and should not be changed for normal use.",
     )
+    parser.add_argument(
+        "--data-source",
+        choices=("spacetrack", "gcs"),
+        default="spacetrack",
+        help="TLE source to use (default: %(default)s).",
+    )
+    parser.add_argument(
+        "--gcs-base-url",
+        type=str,
+        default=None,
+        help="Base HTTPS URL or local directory for partitioned TLE JSONL files, used when --data-source=gcs.",
+    )
 
     # Check if no arguments were provided (sys.argv[0] is the script name)
     if len(sys.argv) == 1:
@@ -518,15 +668,18 @@ def main():
 
     args = parser.parse_args()
 
-    args.SPACEUSER, args.SPACEPSWD = get_credentials(args.domain, args=args)
+    if args.data_source == "spacetrack":
+        args.SPACEUSER, args.SPACEPSWD = get_credentials(args.domain, args=args)
 
-    if args.SPACEUSER is None or args.SPACEPSWD is None:
-        print(netrc_message)
-        raise SystemExit(
-            f"Error: No credentials found for {args.domain}. "
-            "Provide --SPACEUSER and --SPACEPSWD, set SPACEUSER and SPACEPSWD "
-            "environment variables, or add credentials to your ~/.netrc file."
-        )
+        if args.SPACEUSER is None or args.SPACEPSWD is None:
+            print(netrc_message)
+            raise SystemExit(
+                f"Error: No credentials found for {args.domain}. "
+                "Provide --SPACEUSER and --SPACEPSWD, set SPACEUSER and SPACEPSWD "
+                "environment variables, or add credentials to your ~/.netrc file."
+            )
+    elif not args.gcs_base_url:
+        raise SystemExit("Error: --gcs-base-url is required when --data-source=gcs")
 
     if args.csvoutpath is None:
         raise SystemExit("Error: --csvoutpath is required.")
@@ -539,6 +692,8 @@ def main():
         SPACEUSER=args.SPACEUSER,
         SPACEPSWD=args.SPACEPSWD,
         domain=args.domain,
+        data_source=args.data_source,
+        gcs_base_url=args.gcs_base_url,
     )
 
     write_passtimes_csv(
