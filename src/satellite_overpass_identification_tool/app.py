@@ -511,8 +511,7 @@ def get_data_from_gcs(start_date, end_date, gcs_base_url):
         for sat in SATELLITES:
             for year, month in _month_range(start_date, end_date):
                 base = (
-                    f"{base_url}/norad={sat.norad_id}"
-                    f"/year={year:04d}/month={month:02d}"
+                    f"{base_url}/norad={sat.norad_id}/year={year:04d}/month={month:02d}"
                 )
 
                 partition = None
@@ -538,10 +537,7 @@ def get_data_from_gcs(start_date, end_date, gcs_base_url):
 
 def get_data(credentials, start_date, end_date, domain):
     """Fetch TLE data for all configured satellites from Space-Track."""
-    epoch_range = (
-        f"{start_date.strftime('%Y-%m-%d')}"
-        f"--{end_date.strftime('%Y-%m-%d')}"
-    )
+    epoch_range = f"{start_date.strftime('%Y-%m-%d')}--{end_date.strftime('%Y-%m-%d')}"
     norad_ids = ",".join(sat.norad_id for sat in SATELLITES)
     sat_names = ",".join(sat.name for sat in SATELLITES)
 
