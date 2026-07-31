@@ -811,10 +811,18 @@ def main():
     )
     parser.add_argument(
         "--historical-tle-db",
-        type=pathlib.Path,
+        type=str,
         help=(
-            "Path to a local SQLite historical TLE database. "
-            "When supplied, this database is used instead of Space-Track or GCS."
+            "Local SQLite historical TLE database path, a gs:// GCS URI, "
+            "or an HTTP(S) URL. Remote databases are downloaded once and "
+            "cached locally."
+        ),
+    )
+    parser.add_argument(
+        "--refresh-historical-tle-db",
+        action="store_true",
+        help=(
+            "Re-download the historical TLE database even when a cached copy exists."
         ),
     )
     parser.add_argument(
