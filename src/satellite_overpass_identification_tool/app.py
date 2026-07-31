@@ -851,12 +851,17 @@ def main():
     # Local SQLite source overrides remote source selection and requires neither
     # Space-Track credentials nor a GCS base URL.
     if args.historical_tle_db is not None:
-        if not args.historical_tle_db.is_file():
-            raise SystemExit(
-                "Error: historical TLE database does not exist or is not a file: "
-                f"{args.historical_tle_db}"
+        try:
+            args.historical_tle_db = resolve_historical_tle_db(
+                args.historical_tle_db,
+                refresh=args.refresh_historical_tle_db,
             )
+        except Exception as exc:
+            raise SystemExit(
+                f"Error: unable to resolve historical TLE database: {exc}"
+            ) from exc
 
+        # A local/cached historical DB means Space-Track credentials are unnecessary.
         args.SPACEUSER = None
         args.SPACEPSWD = None
 
