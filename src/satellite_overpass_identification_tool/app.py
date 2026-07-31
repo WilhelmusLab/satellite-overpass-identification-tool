@@ -183,10 +183,7 @@ def get_passtimes(
                     print(f"Warning: {exc}")
                     continue
 
-                print(
-                    f"Using {sat.name} historical TLE from {tle_epoch} "
-                    f"for {today}"
-                )
+                print(f"Using {sat.name} historical TLE from {tle_epoch} for {today}")
 
             else:
                 data = satellite_data.get(sat.name, [])
@@ -360,8 +357,7 @@ def get_historical_tle(db_path, norad_id, requested_datetime):
 
     if row is None:
         raise LookupError(
-            f"No historical TLE found for NORAD {norad_id} at or before "
-            f"{requested_iso}"
+            f"No historical TLE found for NORAD {norad_id} at or before {requested_iso}"
         )
 
     return row
