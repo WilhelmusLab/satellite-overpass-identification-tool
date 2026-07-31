@@ -23,16 +23,20 @@ import argparse
 import csv
 import datetime
 import gzip
+import hashlib
 import json
+import os
 import pathlib
 import sqlite3
 import sys
+import tempfile
 from dataclasses import dataclass
 from enum import Enum, IntEnum
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 import numpy as np
 import requests
+from google.cloud import storage
 from skyfield.api import Angle, EarthSatellite, Time, load, utc, wgs84
 
 from .credentials import get_credentials, netrc_message
@@ -361,6 +365,159 @@ def get_historical_tle(db_path, norad_id, requested_datetime):
         )
 
     return row
+
+
+def _historical_tle_cache_dir():
+    """Return the directory used to cache downloaded historical TLE databases."""
+    cache_root = os.environ.get("XDG_CACHE_HOME")
+
+    if cache_root:
+        return pathlib.Path(cache_root) / "soit"
+
+    return pathlib.Path.home() / ".cache" / "soit"
+
+
+def _is_remote_tle_database(value):
+    """Return True when value is a supported remote database URI."""
+    parsed = urlparse(value)
+    return parsed.scheme in ("gs", "http", "https")
+
+
+def _cached_database_path(database_uri):
+    """Return a stable cache filename for a remote database URI."""
+    parsed = urlparse(database_uri)
+    uri_hash = hashlib.sha256(database_uri.encode("utf-8")).hexdigest()[:16]
+
+    basename = pathlib.PurePosixPath(parsed.path).name
+    basename = basename or "historical_tles.sqlite"
+
+    # Ensure cache file looks like a SQLite DB even if the remote name does not.
+    if not basename.endswith(".sqlite"):
+        basename = f"{basename}.sqlite"
+
+    return _historical_tle_cache_dir() / f"{uri_hash}_{basename}"
+
+
+def _download_gcs_object(database_uri, destination):
+    """Download a gs://bucket/object URI to destination using Google credentials."""
+    parsed = urlparse(database_uri)
+
+    bucket_name = parsed.netloc
+    object_name = unquote(parsed.path.lstrip("/"))
+
+    if not bucket_name or not object_name:
+        raise ValueError(
+            "Historical TLE GCS URI must have the form "
+            "gs://BUCKET_NAME/path/to/database.sqlite"
+        )
+
+    client = storage.Client()
+    bucket = client.bucket(bucket_name)
+    blob = bucket.blob(object_name)
+
+    blob.download_to_filename(destination)
+
+
+def _download_http_object(database_url, destination):
+    """Download a public HTTP(S) database URL to destination."""
+    with requests.get(database_url, stream=True, timeout=120) as response:
+        response.raise_for_status()
+
+        with open(destination, "wb") as file_handle:
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                if chunk:
+                    file_handle.write(chunk)
+
+
+def resolve_historical_tle_db(database_location, refresh=False):
+    """Resolve a local DB path or download/cache a remote historical TLE database.
+
+    Args:
+        database_location: Local path, gs:// URI, or HTTP(S) URL.
+        refresh: Download again even if a cached copy already exists.
+
+    Returns:
+        pathlib.Path to a local SQLite database file.
+
+    Raises:
+        FileNotFoundError: If a specified local database does not exist.
+        ValueError: If the URI scheme is unsupported or malformed.
+    """
+    if database_location is None:
+        return None
+
+    database_location = str(database_location)
+
+    # A regular local file path needs no download.
+    if not _is_remote_tle_database(database_location):
+        local_path = pathlib.Path(database_location).expanduser()
+
+        if not local_path.is_file():
+            raise FileNotFoundError(
+                f"Historical TLE database does not exist or is not a file: {local_path}"
+            )
+
+        return local_path
+
+    parsed = urlparse(database_location)
+
+    # file:///path/to/database.sqlite is also supported.
+    if parsed.scheme == "file":
+        local_path = pathlib.Path(unquote(parsed.path)).expanduser()
+
+        if not local_path.is_file():
+            raise FileNotFoundError(
+                f"Historical TLE database does not exist or is not a file: {local_path}"
+            )
+
+        return local_path
+
+    cache_path = _cached_database_path(database_location)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if cache_path.is_file() and cache_path.stat().st_size > 0 and not refresh:
+        print(f"Using cached historical TLE database: {cache_path}")
+        return cache_path
+
+    print(f"Downloading historical TLE database from: {database_location}")
+
+    # Download to a temporary file, then atomically move it into the cache.
+    # This prevents an interrupted download from becoming the cached DB.
+    temporary_file = tempfile.NamedTemporaryFile(
+        prefix=f"{cache_path.name}.",
+        suffix=".download",
+        dir=cache_path.parent,
+        delete=False,
+    )
+    temporary_path = pathlib.Path(temporary_file.name)
+    temporary_file.close()
+
+    try:
+        if parsed.scheme == "gs":
+            _download_gcs_object(database_location, temporary_path)
+
+        elif parsed.scheme in ("http", "https"):
+            _download_http_object(database_location, temporary_path)
+
+        else:
+            raise ValueError(
+                f"Unsupported historical TLE database URI scheme: {parsed.scheme}"
+            )
+
+        if not temporary_path.is_file() or temporary_path.stat().st_size == 0:
+            raise RuntimeError(
+                f"Downloaded historical TLE database is empty: {database_location}"
+            )
+
+        os.replace(temporary_path, cache_path)
+        cache_path.chmod(0o600)
+
+        print(f"Cached historical TLE database at: {cache_path}")
+        return cache_path
+
+    except Exception:
+        temporary_path.unlink(missing_ok=True)
+        raise
 
 
 def get_tli_lines(tle):
