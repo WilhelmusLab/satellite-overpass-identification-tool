@@ -534,6 +534,87 @@ def _month_range(start_date, end_date):
             current = datetime.date(current.year, current.month + 1, 1)
 
 
+def get_data(credentials, start_date, end_date, domain):
+    """Fetch TLE data for all configured satellites from Space-Track."""
+    epoch_range = f"{start_date.strftime('%Y-%m-%d')}--{end_date.strftime('%Y-%m-%d')}"
+    norad_ids = ",".join(sat.norad_id for sat in SATELLITES)
+    sat_names = ",".join(sat.name for sat in SATELLITES)
+
+    login_url = f"https://{domain}/ajaxauth/login"
+    data_url = (
+        f"https://{domain}/basicspacedata/query/class/gp_history/"
+        f"NORAD_CAT_ID/{norad_ids}/orderby/TLE_LINE1%20ASC/"
+        f"EPOCH/{epoch_range}/format/json"
+    )
+
+    satellite_data = {sat.name: [] for sat in SATELLITES}
+
+    with requests.Session() as session:
+        response = session.post(login_url, data=credentials)
+
+        if response.status_code != 200:
+            raise requests.HTTPError(
+                "Login failed for %s with status code: %s %s\n%s"
+                % (
+                    response.url,
+                    response.status_code,
+                    response.reason,
+                    response.text,
+                ),
+                response=response,
+            )
+
+        print(
+            f"Fetching TLE data for {sat_names} (NORAD {norad_ids}) "
+            f"for epoch range {epoch_range} from {domain}..."
+        )
+
+        response = session.get(data_url)
+
+        if response.status_code != 200:
+            raise requests.HTTPError(
+                "Data fetch failed for %s with status code: %s %s\n%s"
+                % (
+                    response.url,
+                    response.status_code,
+                    response.reason,
+                    response.text,
+                ),
+                response=response,
+            )
+
+        payload = json.loads(response.text)
+        error_message = _extract_spacetrack_error(payload)
+
+        if error_message is not None:
+            raise RuntimeError(
+                f"Space-Track API error for {sat_names} "
+                f"(NORAD {norad_ids}): {error_message}"
+            )
+
+    unexpected_norad_ids = set()
+
+    for item in payload:
+        norad_id = str(item.get("NORAD_CAT_ID", ""))
+        sat = SATELLITES_FROM_NORAD_ID.get(norad_id)
+
+        if sat is None:
+            unexpected_norad_ids.add(norad_id or "<missing>")
+            continue
+
+        satellite_data[sat.name].append(item)
+
+    if unexpected_norad_ids:
+        expected = ", ".join(sorted(SATELLITES_FROM_NORAD_ID.keys()))
+        found = ", ".join(sorted(unexpected_norad_ids))
+        raise RuntimeError(
+            "Space-Track response included unexpected NORAD IDs: "
+            f"{found}. Expected only: {expected}."
+        )
+
+    return satellite_data
+
+
 @dataclass
 class OverpassInfo:
     rise_lat: Angle
@@ -782,7 +863,7 @@ def main():
         args.SPACEUSER = None
         args.SPACEPSWD = None
 
-    elif args.data_source == "spacetrack":
+    else:
         args.SPACEUSER, args.SPACEPSWD = get_credentials(args.domain, args=args)
 
         if args.SPACEUSER is None or args.SPACEPSWD is None:
