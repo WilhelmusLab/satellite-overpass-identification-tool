@@ -11,23 +11,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  test:
+  non-credential-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
 
-      - name: Run tests
-        env:
-          SPACEUSER: ${{ vars.SPACEUSER }}
-          SPACEPSWD: ${{ secrets.SPACEPSWD }}
-        run: pytest
+      - name: Sync dependencies
+        run: |
+          uv sync --dev
+
+      - name: Run non-credential tests
+        run: uv run pytest -m "not integration"
