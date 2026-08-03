@@ -96,8 +96,6 @@ def get_passtimes(
     SPACEPSWD=None,
     domain="www.space-track.org",
     historical_tle_db=None,
-    data_source="spacetrack",
-    gcs_base_url=None,
 ):
     """Compute closest Aqua and Terra overpass times for each day in a date range.
 
@@ -113,8 +111,6 @@ def get_passtimes(
         SPACEPSWD: Space-Track password, when using the Space-Track source.
         domain: Space-Track API domain.
         historical_tle_db: Optional SQLite historical TLE database path.
-        data_source: Either ``"spacetrack"`` or ``"gcs"``.
-        gcs_base_url: Base HTTPS URL or local directory for GCS-style TLE data.
 
     Returns:
         A NumPy structured array with date, satellite, and overpass_time fields.
@@ -129,17 +125,7 @@ def get_passtimes(
     if historical_tle_db is not None:
         print(f"Using historical TLE database: {historical_tle_db}")
 
-    elif data_source == "gcs":
-        if not gcs_base_url:
-            raise ValueError("--gcs-base-url is required when --data-source=gcs")
-
-        satellite_data = get_data_from_gcs(
-            start_date,
-            end_date_next,
-            gcs_base_url,
-        )
-
-    elif data_source == "spacetrack":
+    else:
         site_credentials = {"identity": SPACEUSER, "password": SPACEPSWD}
         satellite_data = get_data(
             site_credentials,
@@ -147,9 +133,6 @@ def get_passtimes(
             end_date_next,
             domain,
         )
-
-    else:
-        raise ValueError(f"Unsupported data source: {data_source}")
 
     ts = load.timescale()
     aoi = wgs84.latlon(lat, lon)
@@ -767,22 +750,6 @@ def main():
             "Re-download the historical TLE database even when a cached copy exists."
         ),
     )
-    parser.add_argument(
-        "--data-source",
-        choices=("spacetrack", "gcs"),
-        default="spacetrack",
-        help="Remote TLE source to use when no historical database is supplied.",
-    )
-    parser.add_argument(
-        "--gcs-base-url",
-        type=str,
-        default=None,
-        help=(
-            "Base HTTPS URL, file:// URL, or local directory for partitioned "
-            "TLE JSONL files. Required for --data-source=gcs."
-        ),
-    )
-
     if len(sys.argv) == 1:
         parser.print_help()
         parser.exit(0)
@@ -798,8 +765,8 @@ def main():
     if not -180.0 <= args.lon <= 180.0:
         raise SystemExit("Error: longitude must be between -180 and 180 degrees.")
 
-    # Local SQLite source overrides remote source selection and requires neither
-    # Space-Track credentials nor a GCS base URL.
+    # Local SQLite source overrides remote source selection and requires no
+    # Space-Track credentials.
     if args.historical_tle_db is not None:
         try:
             args.historical_tle_db = resolve_historical_tle_db(
@@ -826,12 +793,6 @@ def main():
                 "SPACEPSWD environment variables, or add credentials to ~/.netrc."
             )
 
-    elif args.data_source == "gcs":
-        if not args.gcs_base_url:
-            raise SystemExit(
-                "Error: --gcs-base-url is required when --data-source=gcs."
-            )
-
     passtimes = get_passtimes(
         start_date=args.start_date,
         end_date=args.end_date,
@@ -841,8 +802,6 @@ def main():
         SPACEPSWD=args.SPACEPSWD,
         domain=args.domain,
         historical_tle_db=args.historical_tle_db,
-        data_source=args.data_source,
-        gcs_base_url=args.gcs_base_url,
     )
 
     write_passtimes_csv(
