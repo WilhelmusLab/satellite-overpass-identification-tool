@@ -753,10 +753,11 @@ def main():
     parser.add_argument(
         "--historical-tle-db",
         type=str,
+        default="gs://tle-db/aqua_terra_historical_tles_2004_2025.sqlite",
         help=(
             "Local SQLite historical TLE database path, a gs:// GCS URI, "
             "or an HTTP(S) URL. Remote databases are downloaded once and "
-            "cached locally."
+            "cached locally. Default: %(default)s"
         ),
     )
     parser.add_argument(
