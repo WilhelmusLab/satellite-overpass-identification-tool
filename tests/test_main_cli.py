@@ -23,6 +23,16 @@ def test_no_args_prints_help_and_exits(monkeypatch, capsys):
         (
             [
                 "satellite-overpass-identification-tool",
+                "--startdate",
+                "2026-03-20",
+                "--enddate",
+                "2026-03-21",
+                "--lat",
+                "41.0",
+                "--lon",
+                "-71.0",
+                "--csvoutpath",
+                "out.csv",
                 "--unknown-option",
             ],
             "unrecognized arguments: --unknown-option",
@@ -67,7 +77,7 @@ def test_invalid_cli_arguments_exit_with_parser_error(
     assert error_text in captured.err
 
 
-def test_missing_csvoutpath_exits_with_clear_error(monkeypatch):
+def test_missing_csvoutpath_exits_with_clear_error(monkeypatch, capsys):
     """Parsed arguments without --csvoutpath should exit before any API calls."""
     monkeypatch.setattr(
         app_module,
@@ -89,14 +99,25 @@ def test_missing_csvoutpath_exits_with_clear_error(monkeypatch):
         ],
     )
 
-    with pytest.raises(SystemExit, match="--csvoutpath is required"):
+    with pytest.raises(SystemExit) as exc_info:
         app_module.main()
 
+    assert exc_info.value.code == 2
+    captured = capsys.readouterr()
+    assert "--csvoutpath" in captured.err
 
-def test_missing_credentials_exits_with_helpful_message(monkeypatch, capsys):
-    """When credentials cannot be resolved, main() should print guidance and exit."""
+
+def test_default_historical_db_bypasses_credential_lookup(monkeypatch, tmp_path):
+    """Default historical DB path should run without calling get_credentials."""
+    output_path = tmp_path / "out.csv"
+
+    def _unexpected_credentials_call(_domain, args=None):
+        raise AssertionError("get_credentials should not be called")
+
     monkeypatch.setattr(
-        app_module, "get_credentials", lambda _domain, args=None: (None, None)
+        app_module,
+        "get_credentials",
+        _unexpected_credentials_call,
     )
     monkeypatch.setattr(
         "sys.argv",
@@ -111,14 +132,9 @@ def test_missing_credentials_exits_with_helpful_message(monkeypatch, capsys):
             "--lon",
             "-71.0",
             "--csvoutpath",
-            "out.csv",
+            str(output_path),
         ],
     )
 
-    with pytest.raises(SystemExit, match="No credentials found"):
-        app_module.main()
-
-    captured = capsys.readouterr()
-    assert "SPACEUSER" in captured.out
-    assert "SPACEPSWD" in captured.out
-    assert ".netrc" in captured.out
+    app_module.main()
+    assert output_path.is_file()
