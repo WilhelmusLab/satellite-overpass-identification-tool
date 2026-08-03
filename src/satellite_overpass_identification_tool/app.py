@@ -3,6 +3,7 @@
 Authors:
 - Simon Hatcher (2022)
 - Timothy Divoll (2023)
+- Carlos Paniagua (2024/2026)
 - John Gerrard Holland (2026)
 
 This module fetches Two-Line Element (TLE) history from space-track.org and computes closest
