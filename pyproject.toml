@@ -5,12 +5,14 @@ authors = [
     {name="Simon Hatcher"},
     {name="Timothy Divoll", email = "timothy_divoll@brown.edu"},
     {name="John Gerrard Holland", email = "john_holland1@brown.edu"}
+    {name="Carlos Paniagua", email = "carlos_paniagua@brown.edu"}
 ]
-requires-python = ">= 3.10"
+requires-python = ">= 3.11"
 dependencies = [
   "requests==2.33.1",
   "skyfield==1.54",
   "numpy==2.4.4",
+  "google-cloud-storage>=3.13.0",
 ]
 
 [project.optional-dependencies]
