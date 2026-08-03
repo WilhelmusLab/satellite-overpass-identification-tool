@@ -97,3 +97,40 @@ def test_rate_limited_helper_raises_value_error_when_max_requests_too_low(domain
             max_requests_per_minute=1,
             requests_per_get_data_call=2,
         )
+
+
+def test_get_data_raises_on_unexpected_norad_id(monkeypatch, domain):
+    """get_data should fail loudly if payload includes an unexpected NORAD ID."""
+
+    class _Response:
+        def __init__(self, status_code, text):
+            self.status_code = status_code
+            self.text = text
+            self.url = "https://example.test"
+            self.reason = "OK"
+
+    class _Session:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def post(self, url, data):
+            return _Response(200, "{}")
+
+        def get(self, url):
+            return _Response(
+                200,
+                '[{"NORAD_CAT_ID": "99999", "TLE_LINE1": "1", "TLE_LINE2": "2"}]',
+            )
+
+    monkeypatch.setattr(app_module.requests, "Session", lambda: _Session())
+
+    with pytest.raises(RuntimeError, match="unexpected NORAD IDs"):
+        app_module.get_data(
+            credentials={"identity": "user", "password": "pass"},
+            start_date=dt.date(2025, 5, 15),
+            end_date=dt.date(2025, 5, 16),
+            domain=domain,
+        )
