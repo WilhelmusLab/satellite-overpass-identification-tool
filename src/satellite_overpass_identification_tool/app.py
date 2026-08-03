@@ -31,6 +31,7 @@ import pathlib
 import sqlite3
 import sys
 import tempfile
+from contextlib import closing
 from dataclasses import dataclass
 from enum import Enum, IntEnum
 from urllib.parse import unquote, urlparse
@@ -343,7 +344,7 @@ def get_historical_tle(db_path, norad_id, requested_datetime):
 
     requested_iso = requested_datetime.isoformat()
 
-    with sqlite3.connect(db_path) as connection:
+    with closing(sqlite3.connect(db_path)) as connection:
         row = connection.execute(
             """
             SELECT epoch_utc, line1, line2
