@@ -10,8 +10,8 @@ This module computes closest Aqua/Terra overpass times for a target location and
 date range.
 
 Supported TLE sources:
-- Historical SQLite database (preferred), supplied as a local path, ``file://`` URI,
-    or HTTP(S) URL.
+- Historical SQLite database (preferred), supplied as a local path or HTTP(S)
+    URL.
 - Space-Track ``gp_history`` API (fallback when no historical DB is provided).
 
 Remote historical DBs are downloaded once and cached locally for repeat runs, with
@@ -40,7 +40,7 @@ import tempfile
 from contextlib import closing
 from dataclasses import dataclass
 from enum import Enum, IntEnum
-from urllib.parse import unquote, urlparse
+from urllib.parse import urlparse
 
 import numpy as np
 import requests
@@ -413,23 +413,17 @@ def resolve_historical_tle_db(database_location, refresh=False):
         return None
 
     database_location = str(database_location)
+    parsed = urlparse(database_location)
+
+    # Treat URI-like inputs with non-HTTP schemes as unsupported.
+    if "://" in database_location and parsed.scheme not in ("http", "https"):
+        raise ValueError(
+            f"Unsupported historical TLE database URI scheme: {parsed.scheme}"
+        )
 
     # A regular local file path needs no download.
     if not _is_remote_tle_database(database_location):
         local_path = pathlib.Path(database_location).expanduser()
-
-        if not local_path.is_file():
-            raise FileNotFoundError(
-                f"Historical TLE database does not exist or is not a file: {local_path}"
-            )
-
-        return local_path
-
-    parsed = urlparse(database_location)
-
-    # file:///path/to/database.sqlite is also supported.
-    if parsed.scheme == "file":
-        local_path = pathlib.Path(unquote(parsed.path)).expanduser()
 
         if not local_path.is_file():
             raise FileNotFoundError(
