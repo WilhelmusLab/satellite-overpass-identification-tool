@@ -173,8 +173,6 @@ def get_passtimes(
                     print(f"Warning: {exc}")
                     continue
 
-                print(f"Using {sat.name} historical TLE from {tle_epoch} for {today}")
-
             else:
                 data = satellite_data.get(sat.name, [])
 
