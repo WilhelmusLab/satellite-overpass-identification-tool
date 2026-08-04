@@ -65,3 +65,16 @@ If you are using [space-track.org](https://www.space-track.org/auth/createAccoun
    ```bash
    chmod og-rw ~/.netrc
    ```
+
+To use API mode from the executable (instead of the default historical DB
+mode), set `--domain`/`-d`:
+
+```bash
+soit \
+  --domain www.space-track.org \
+  --startdate 2024-01-01 \
+  --enddate 2024-01-05 \
+  --lat 40.7128 \
+  --lon -74.0060 \
+  --csvoutpath ./overpasses_spacetrack.csv
+```
