@@ -38,7 +38,6 @@ from urllib.parse import unquote, urlparse
 
 import numpy as np
 import requests
-from google.cloud import storage
 from skyfield.api import Angle, EarthSatellite, Time, load, utc, wgs84
 
 from .credentials import get_credentials, netrc_message
@@ -361,7 +360,7 @@ def _historical_tle_cache_dir():
 def _is_remote_tle_database(value):
     """Return True when value is a supported remote database URI."""
     parsed = urlparse(value)
-    return parsed.scheme in ("gs", "http", "https")
+    return parsed.scheme in ("http", "https")
 
 
 def _cached_database_path(database_uri):
@@ -379,26 +378,6 @@ def _cached_database_path(database_uri):
     return _historical_tle_cache_dir() / f"{uri_hash}_{basename}"
 
 
-def _download_gcs_object(database_uri, destination):
-    """Download a gs://bucket/object URI to destination using Google credentials."""
-    parsed = urlparse(database_uri)
-
-    bucket_name = parsed.netloc
-    object_name = unquote(parsed.path.lstrip("/"))
-
-    if not bucket_name or not object_name:
-        raise ValueError(
-            "Historical TLE GCS URI must have the form "
-            "gs://BUCKET_NAME/path/to/database.sqlite"
-        )
-
-    client = storage.Client()
-    bucket = client.bucket(bucket_name)
-    blob = bucket.blob(object_name)
-
-    blob.download_to_filename(destination)
-
-
 def _download_http_object(database_url, destination):
     """Download a public HTTP(S) database URL to destination."""
     with requests.get(database_url, stream=True, timeout=120) as response:
@@ -414,7 +393,7 @@ def resolve_historical_tle_db(database_location, refresh=False):
     """Resolve a local DB path or download/cache a remote historical TLE database.
 
     Args:
-        database_location: Local path, gs:// URI, or HTTP(S) URL.
+        database_location: Local path or HTTP(S) URL.
         refresh: Download again even if a cached copy already exists.
 
     Returns:
@@ -474,10 +453,7 @@ def resolve_historical_tle_db(database_location, refresh=False):
     temporary_file.close()
 
     try:
-        if parsed.scheme == "gs":
-            _download_gcs_object(database_location, temporary_path)
-
-        elif parsed.scheme in ("http", "https"):
+        if parsed.scheme in ("http", "https"):
             _download_http_object(database_location, temporary_path)
 
         else:
@@ -502,7 +478,7 @@ def resolve_historical_tle_db(database_location, refresh=False):
 
 
 def get_tli_lines(tle):
-    """Extract TLE lines from a Space-Track/GCS JSON record."""
+    """Extract TLE lines from a Space-Track JSON record."""
     return tle["TLE_LINE1"], tle["TLE_LINE2"]
 
 
@@ -819,8 +795,8 @@ def main():
         type=str,
         default="https://storage.googleapis.com/tle-db/aqua_terra_historical_tles_2004_2025.sqlite",
         help=(
-            "Local SQLite historical TLE database path, a gs:// GCS URI, "
-            "or an HTTP(S) URL. Remote databases are downloaded once and "
+            "Local SQLite historical TLE database path or an HTTP(S) URL. "
+            "Remote databases are downloaded once and "
             "cached locally. Default: %(default)s"
         ),
     )
