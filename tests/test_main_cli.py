@@ -224,3 +224,11 @@ def test_explicit_domain_forces_credential_lookup(monkeypatch, tmp_path, domain_
 
     app_module.main()
     assert saw_credentials_call["value"] is True
+
+
+def test_resolve_historical_tle_db_rejects_file_uri_scheme():
+    """file:// URIs are intentionally unsupported for historical DB input."""
+    with pytest.raises(ValueError) as exc_info:
+        app_module.resolve_historical_tle_db("file:///tmp/historical.sqlite")
+
+    assert str(exc_info.value) == "Unsupported historical TLE database URI scheme: file"
