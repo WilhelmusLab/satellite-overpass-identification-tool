@@ -152,3 +152,5 @@ cython_debug/
 ehthumbs.db
 Thumbs.db
 uv.lock
+*.csv
+.netrc
