@@ -28,7 +28,6 @@ interest.
 import argparse
 import csv
 import datetime
-import gzip
 import hashlib
 import json
 import os
