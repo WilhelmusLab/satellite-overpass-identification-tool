@@ -792,7 +792,9 @@ def main():
         type=str,
         default=None,
         help=(
-            "Base domain for Space-Track API. Intended for testing with a mock server."
+            "Base domain for Space-Track API. When provided, API mode is used "
+            "instead of historical database mode. Intended for testing with a "
+            "mock server. Cannot be combined with --refresh-historical-tle-db."
         ),
     )
     parser.add_argument(
