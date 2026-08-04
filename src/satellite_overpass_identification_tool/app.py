@@ -20,6 +20,8 @@ an option to refresh the cache.
 Credential behavior:
 - Credentials are required for Space-Track API access and can be provided via
     ``--SPACEUSER``/``--SPACEPSWD``, environment variables, or ``~/.netrc``.
+- Setting ``--domain``/``-d`` uses API mode, bypassing historical
+    database mode.
 
 Centroid is the approximate point in the middle of your bounding-box area of
 interest.
@@ -788,10 +790,9 @@ def main():
         "--domain",
         "-d",
         type=str,
-        default="www.space-track.org",
+        default=None,
         help=(
-            "Base domain for Space-Track API (default: %(default)s). "
-            "Intended for testing with a mock server."
+            "Base domain for Space-Track API. Intended for testing with a mock server."
         ),
     )
     parser.add_argument(
@@ -817,6 +818,9 @@ def main():
 
     args = parser.parse_args()
 
+    explicit_domain_requested = args.domain is not None
+    effective_domain = (args.domain or "www.space-track.org").strip()
+
     if args.end_date < args.start_date:
         raise SystemExit("Error: --enddate must be on or after --startdate.")
 
@@ -825,6 +829,15 @@ def main():
 
     if not -180.0 <= args.lon <= 180.0:
         raise SystemExit("Error: longitude must be between -180 and 180 degrees.")
+
+    if explicit_domain_requested and args.refresh_historical_tle_db:
+        raise SystemExit(
+            "Error: --refresh-historical-tle-db cannot be used when "
+            "--domain/-d is explicitly provided."
+        )
+
+    if explicit_domain_requested:
+        args.historical_tle_db = None
 
     # Local SQLite source overrides remote source selection and requires no
     # Space-Track credentials.
@@ -844,12 +857,12 @@ def main():
         args.SPACEPSWD = None
 
     else:
-        args.SPACEUSER, args.SPACEPSWD = get_credentials(args.domain, args=args)
+        args.SPACEUSER, args.SPACEPSWD = get_credentials(effective_domain, args=args)
 
         if args.SPACEUSER is None or args.SPACEPSWD is None:
             print(netrc_message)
             raise SystemExit(
-                f"Error: no credentials found for {args.domain}. "
+                f"Error: no credentials found for {effective_domain}. "
                 "Provide --SPACEUSER and --SPACEPSWD, set SPACEUSER and "
                 "SPACEPSWD environment variables, or add credentials to ~/.netrc."
             )
@@ -861,7 +874,7 @@ def main():
         lon=args.lon,
         SPACEUSER=args.SPACEUSER,
         SPACEPSWD=args.SPACEPSWD,
-        domain=args.domain,
+        domain=effective_domain,
         historical_tle_db=args.historical_tle_db,
     )
 
