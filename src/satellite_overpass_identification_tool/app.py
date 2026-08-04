@@ -6,18 +6,23 @@ Authors:
 - Carlos Paniagua (2024/2026)
 - John Gerrard Holland (2026)
 
-This module fetches Two-Line Element (TLE) history from space-track.org and computes closest
-Aqua/Terra overpass times for a target location and date range.
+This module computes closest Aqua/Terra overpass times for a target location and
+date range.
 
-Centroid is the approximate point in the middle of your bounding box area of interest.
-Your www.space-track.org credentials (https://www.space-track.org/auth/createAccount for free account)
-need to be:
-- provided via --SPACEUSER and --SPACEPSWD command line arguments, or
-- set as environment variables SPACEUSER and SPACEPSWD, or
-- added to your ~/.netrc file in the format:
-  machine www.space-track.org
-      login your_username
-      password your_password
+Supported TLE sources:
+- Historical SQLite database (preferred), supplied as a local path, ``file://`` URI,
+    or HTTP(S) URL.
+- Space-Track ``gp_history`` API (fallback when no historical DB is provided).
+
+Remote historical DBs are downloaded once and cached locally for repeat runs, with
+an option to refresh the cache.
+
+Credential behavior:
+- Credentials are required for Space-Track API access and can be provided via
+    ``--SPACEUSER``/``--SPACEPSWD``, environment variables, or ``~/.netrc``.
+
+Centroid is the approximate point in the middle of your bounding-box area of
+interest.
 """
 
 import argparse
