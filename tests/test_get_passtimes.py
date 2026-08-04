@@ -134,9 +134,9 @@ def test_get_passtimes(
         domain=domain,
     )
 
-    assert (
-        len(passtimes) == expected_rows
-    ), f"Expected {expected_rows} data rows, got {len(passtimes)}"
+    assert len(passtimes) == expected_rows, (
+        f"Expected {expected_rows} data rows, got {len(passtimes)}"
+    )
     assert passtimes.dtype == PASS_TIMES_DTYPE
 
 
@@ -310,9 +310,9 @@ def test_get_passtimes_specific(
 
     # Verify expected row counts
     expected_rows = sum(x is not None for x in (expected_aqua, expected_terra))
-    assert (
-        len(passtimes) == expected_rows
-    ), f"Expected {expected_rows} rows, got {len(passtimes)}"
+    assert len(passtimes) == expected_rows, (
+        f"Expected {expected_rows} rows, got {len(passtimes)}"
+    )
 
     # Verify each satellite
     for expected, sat_rows, name in [
@@ -322,9 +322,9 @@ def test_get_passtimes_specific(
         if expected is not None:
             assert len(sat_rows) == 1, f"Expected 1 {name} overpass"
             assert sat_rows[0]["date"] == date
-            assert (
-                sat_rows[0]["overpass_time"] == expected
-            ), f"{name} time unexpected: {sat_rows[0]['overpass_time']}"
+            assert sat_rows[0]["overpass_time"] == expected, (
+                f"{name} time unexpected: {sat_rows[0]['overpass_time']}"
+            )
 
 
 @pytest.fixture(scope="module")
@@ -743,7 +743,7 @@ def test_get_passtimes_validated_longitude_grid(
     domain,
 ):
     """Validate each satellite overpass is within ~2 minutes of expected_time."""
-    tolerance_seconds=120
+    tolerance_seconds = 120
     username = validated_grid_data["username"]
     password = validated_grid_data["password"]
     satellite_data = validated_grid_data["satellite_data"]
@@ -774,6 +774,6 @@ def test_get_passtimes_validated_longitude_grid(
     expected_dt = dt.datetime.fromisoformat(expected_time.replace("Z", "+00:00"))
 
     time_delta_seconds = abs((observed_dt - expected_dt).total_seconds())
-    assert (
-        time_delta_seconds <= tolerance_seconds
-    ), f"{satellite} overpass at lon={lon} differs from expected by {time_delta_seconds:.0f}s"
+    assert time_delta_seconds <= tolerance_seconds, (
+        f"{satellite} overpass at lon={lon} differs from expected by {time_delta_seconds:.0f}s"
+    )
