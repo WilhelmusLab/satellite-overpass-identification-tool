@@ -4,6 +4,49 @@ import pytest
 
 import satellite_overpass_identification_tool.app as app_module
 
+INVALID_CLI_ARGUMENT_CASES = [
+    (
+        [
+            "satellite-overpass-identification-tool",
+            "--startdate",
+            "2026-03-20",
+            "--enddate",
+            "2026-03-21",
+            "--lat",
+            "41.0",
+            "--lon",
+            "-71.0",
+            "--csvoutpath",
+            "out.csv",
+            "--unknown-option",
+        ],
+        "unrecognized arguments: --unknown-option",
+    ),
+    (
+        [
+            "satellite-overpass-identification-tool",
+            "--startdate",
+        ],
+        "argument --startdate: expected one argument",
+    ),
+    (
+        [
+            "satellite-overpass-identification-tool",
+            "--startdate",
+            "03-26-2026",
+        ],
+        "invalid fromisoformat value",
+    ),
+    (
+        [
+            "satellite-overpass-identification-tool",
+            "--lat",
+            "north",
+        ],
+        "argument --centroid-lat/--lat: invalid float value",
+    ),
+]
+
 
 def test_no_args_prints_help_and_exits(monkeypatch, capsys):
     """Invoking main() with no CLI arguments prints help text and exits with status 0."""
@@ -19,48 +62,7 @@ def test_no_args_prints_help_and_exits(monkeypatch, capsys):
 
 @pytest.mark.parametrize(
     "argv,error_text",
-    [
-        (
-            [
-                "satellite-overpass-identification-tool",
-                "--startdate",
-                "2026-03-20",
-                "--enddate",
-                "2026-03-21",
-                "--lat",
-                "41.0",
-                "--lon",
-                "-71.0",
-                "--csvoutpath",
-                "out.csv",
-                "--unknown-option",
-            ],
-            "unrecognized arguments: --unknown-option",
-        ),
-        (
-            [
-                "satellite-overpass-identification-tool",
-                "--startdate",
-            ],
-            "argument --startdate: expected one argument",
-        ),
-        (
-            [
-                "satellite-overpass-identification-tool",
-                "--startdate",
-                "03-26-2026",
-            ],
-            "invalid fromisoformat value",
-        ),
-        (
-            [
-                "satellite-overpass-identification-tool",
-                "--lat",
-                "north",
-            ],
-            "argument --centroid-lat/--lat: invalid float value",
-        ),
-    ],
+    INVALID_CLI_ARGUMENT_CASES,
 )
 def test_invalid_cli_arguments_exit_with_parser_error(
     monkeypatch, capsys, argv, error_text
