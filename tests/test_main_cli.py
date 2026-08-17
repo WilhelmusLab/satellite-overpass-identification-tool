@@ -225,7 +225,7 @@ def test_explicit_domain_forces_credential_lookup(monkeypatch, tmp_path, domain_
     )
 
     app_module.main()
-    assert saw_credentials_call["value"] is True
+    assert saw_credentials_call["value"]
 
 
 def test_resolve_historical_tle_db_rejects_file_uri_scheme():
