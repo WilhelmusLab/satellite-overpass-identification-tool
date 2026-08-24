@@ -93,9 +93,9 @@ def test_process_passes_with_representative_terra_events(
         expected_time, expected_direction = expectation
         actual_time = actual.time.utc_strftime("%H:%M:%S")
         actual_direction = actual.direction
-        assert (
-            actual_direction == expected_direction
-        ), f"Expected direction {expected_direction.value} but got {actual_direction.value if actual_direction else 'None'}"
+        assert actual_direction == expected_direction, (
+            f"Expected direction {expected_direction.value} but got {actual_direction.value if actual_direction else 'None'}"
+        )
         assert (
             abs(
                 (
